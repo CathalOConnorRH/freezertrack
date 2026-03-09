@@ -188,7 +188,8 @@ ExecStart=${INSTALL_DIR}/backend/venv/bin/uvicorn app.main:app --host 0.0.0.0 --
 WantedBy=multi-user.target
 SERVICE
 systemctl daemon-reload
-systemctl enable --now freezertrack
+systemctl enable freezertrack
+systemctl restart freezertrack
 ok "Service created and started"
 
 # ── Done ─────────────────────────────────────────────────────────────────────
