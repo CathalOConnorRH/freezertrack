@@ -6,7 +6,7 @@ source <(curl -fsSL https://raw.githubusercontent.com/community-scripts/ProxmoxV
 # Source: https://github.com/CathalOConnorRH/freezertrack
 
 APP="FreezerTrack"
-var_tags="${var_tags:-home-automation;inventory}"
+var_tags="${var_tags:-freezertrack}"
 var_cpu="${var_cpu:-2}"
 var_ram="${var_ram:-2048}"
 var_disk="${var_disk:-6}"
