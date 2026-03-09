@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+alembic
+pydantic-settings
+httpx
+qrcode[pil]
+Pillow
+python-multipart
+pytest
+pytest-asyncio
+niimprint

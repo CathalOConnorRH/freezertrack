@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+:root {
+  --ice-blue: #5dade2;
+  --navy: #1b2a4a;
+}
+
+body {
+  font-family: "DM Sans", sans-serif;
+}
