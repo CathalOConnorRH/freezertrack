@@ -37,19 +37,29 @@ Both Docker and Podman are supported. The compose file uses `network_mode: host`
 
 If using Podman rootless and Bluetooth fails, run with `sudo` or configure the BlueZ D-Bus policy to allow your user access.
 
+## Standalone Install (Raspberry Pi / any Debian system)
+
+Install directly on a Raspberry Pi or any Debian/Ubuntu machine (arm64 or amd64). No Docker or Proxmox needed:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/CathalOConnorRH/freezertrack/main/install.sh | sudo bash
+```
+
+This installs Python 3, Node.js 22, and nginx natively, builds the frontend, and sets up a systemd service. Works on Raspberry Pi OS, Ubuntu, and Debian. Re-run the same command to update.
+
 ## Proxmox LXC Install
 
-Install FreezerTrack as a native LXC container on Proxmox VE (no Docker required). Works on both amd64 and arm64 hosts. Run this on your Proxmox host shell:
+Install as an LXC container on a **Proxmox VE x86_64** host. Run this on your Proxmox host shell:
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/CathalOConnorRH/freezertrack/main/proxmox/ct/FreezerTrack.sh)"
 ```
 
-This uses the [community-scripts/ProxmoxVE](https://github.com/community-scripts/ProxmoxVE) framework to create a Debian 13 LXC with 2 CPU cores, 2 GB RAM, and 6 GB disk (all configurable during setup). Python, Node.js, and nginx are installed natively inside the container.
+This uses the [community-scripts/ProxmoxVE](https://github.com/community-scripts/ProxmoxVE) framework to create a Debian 12 LXC with 2 CPU cores, 2 GB RAM, and 6 GB disk (all configurable during setup).
 
-**Defaults**: 2 vCPU, 2048 MB RAM, 6 GB disk, Debian 13, unprivileged container.
+**Note**: The Proxmox LXC script requires an x86_64 Proxmox host. For ARM hosts (Pimox / Raspberry Pi), use the standalone installer above instead.
 
-To **update** an existing installation, run the same command again and select "Update".
+To **update** an existing LXC installation, run the same command again and select "Update".
 
 ## One-Time Pi Bluetooth Setup
 
