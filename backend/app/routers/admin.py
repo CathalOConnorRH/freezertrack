@@ -71,13 +71,25 @@ def _write_env(data: dict) -> None:
 
 @router.get("/config")
 def get_config():
-    env = _read_env()
-    return {
-        "settings": {k: env.get(k, "") for k in EDITABLE_KEYS},
-        "readonly": {
-            "DATABASE_URL": env.get("DATABASE_URL", ""),
-        },
-    }
+    try:
+        env_path = _resolve_env_path()
+        env = _read_env()
+        return {
+            "settings": {k: env.get(k, "") for k in EDITABLE_KEYS},
+            "readonly": {
+                "DATABASE_URL": env.get("DATABASE_URL", ""),
+            },
+            "env_path": env_path,
+            "env_found": os.path.exists(env_path),
+        }
+    except Exception as e:
+        return {
+            "settings": {k: "" for k in EDITABLE_KEYS},
+            "readonly": {"DATABASE_URL": ""},
+            "error": str(e),
+            "searched_paths": [p for p in _SEARCH_PATHS if p],
+            "cwd": os.getcwd(),
+        }
 
 
 class ConfigUpdate(BaseModel):
