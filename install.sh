@@ -160,7 +160,9 @@ server {
 
     location / {
         try_files $uri /index.html;
-        add_header Cache-Control "no-cache";
+        add_header Cache-Control "no-store, no-cache, must-revalidate";
+        add_header Pragma "no-cache";
+        etag off;
     }
 }
 NGINX

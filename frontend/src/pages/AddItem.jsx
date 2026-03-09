@@ -37,7 +37,7 @@ export default function AddItem() {
         notes: form.notes || null,
         auto_print: form.auto_print,
       });
-      navigate(cameFromScanner ? "/scan" : "/");
+      navigate(cameFromScanner ? "/scan" : "/", { replace: true });
     } catch (err) {
       alert("Failed to add item");
     } finally {
