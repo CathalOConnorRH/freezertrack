@@ -23,14 +23,14 @@ export default function AlertBanner({ alerts = [] }) {
         return (
           <div
             key={i}
-            className={`flex items-center justify-between px-4 py-3 rounded-lg border ${bg}`}
+            className={`flex items-start gap-2 justify-between px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg border ${bg}`}
           >
-            <span className={`text-sm font-medium ${text}`}>
+            <span className={`text-xs sm:text-sm font-medium ${text} leading-snug`}>
               {isLowStock
                 ? `Only ${alert.current_count} items left in freezer`
                 : `${alert.name} has been frozen for ${alert.days_frozen} days`}
             </span>
-            <button onClick={() => dismiss(i)} className={`${text} hover:opacity-70`}>
+            <button onClick={() => dismiss(i)} className={`${text} hover:opacity-70 shrink-0 p-0.5`}>
               <X size={16} />
             </button>
           </div>

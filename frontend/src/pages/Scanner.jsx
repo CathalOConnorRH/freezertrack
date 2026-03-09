@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { removeItem, lookupBarcode } from "../api/client";
 import ScanInput from "../components/ScanInput";
@@ -31,7 +31,10 @@ export default function Scanner() {
       if (data.found) {
         navigate("/add", { state: { barcode: rawString, prefill: data } });
       } else {
-        setResult({ type: "warn", message: `No product found for ${rawString}` });
+        setResult({
+          type: "warn",
+          message: `No product found for ${rawString}`,
+        });
       }
     } catch {
       setResult({ type: "error", message: "Lookup failed. Try again." });
@@ -46,9 +49,9 @@ export default function Scanner() {
 
   return (
     <div className="max-w-lg mx-auto">
-      <h2 className="text-2xl font-bold mb-6">Scanner</h2>
+      <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Scanner</h2>
 
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-4 sm:mb-6">
         <TabButton
           active={tab === "camera"}
           onClick={() => setTab("camera")}
@@ -66,7 +69,7 @@ export default function Scanner() {
 
       {result && (
         <div
-          className={`mt-6 px-4 py-3 rounded-lg border text-sm font-medium ${
+          className={`mt-4 sm:mt-6 px-4 py-3 rounded-lg border text-sm font-medium ${
             resultColors[result.type]
           }`}
         >
@@ -81,7 +84,7 @@ function TabButton({ active, onClick, label }) {
   return (
     <button
       onClick={onClick}
-      className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+      className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors active:scale-[0.98] ${
         active
           ? "bg-[var(--ice-blue)] text-white"
           : "bg-gray-100 text-gray-600 hover:bg-gray-200"
