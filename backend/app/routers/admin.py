@@ -1,4 +1,3 @@
-import asyncio
 import os
 import subprocess
 import threading
@@ -11,10 +10,12 @@ from app.config import settings
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
-ENV_PATH = os.environ.get(
-    "FREEZERTRACK_ENV_PATH",
+_SEARCH_PATHS = [
+    os.environ.get("FREEZERTRACK_ENV_PATH", ""),
+    "/opt/freezertrack/.env",
+    os.path.join(os.getcwd(), ".env"),
     os.path.join(os.path.dirname(__file__), "..", "..", ".env"),
-)
+]
 
 _update_state = {
     "running": False,
@@ -32,6 +33,15 @@ EDITABLE_KEYS = {
     "ALERT_DAYS_FROZEN",
     "LOW_STOCK_THRESHOLD",
 }
+
+
+def _resolve_env_path() -> str:
+    for p in _SEARCH_PATHS:
+        if p and os.path.isfile(p):
+            return os.path.abspath(p)
+        if p and os.path.isfile(os.path.abspath(p)):
+            return os.path.abspath(p)
+    return os.path.abspath(".env")
 
 
 def _read_env() -> dict:
@@ -57,12 +67,6 @@ def _write_env(data: dict) -> None:
         lines.append(f"{key}={value}")
     with open(path, "w") as f:
         f.write("\n".join(lines) + "\n")
-
-
-def _resolve_env_path() -> str:
-    if os.path.isabs(ENV_PATH):
-        return ENV_PATH
-    return os.path.abspath(ENV_PATH)
 
 
 @router.get("/config")

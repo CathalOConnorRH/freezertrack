@@ -19,6 +19,7 @@ const FIELD_META = {
 
 export default function Admin() {
   const [config, setConfig] = useState(null);
+  const [loadError, setLoadError] = useState(false);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState(null);
@@ -29,10 +30,12 @@ export default function Admin() {
   const logRef = useRef(null);
 
   useEffect(() => {
-    getConfig().then((data) => {
-      setConfig(data);
-      setForm(data.settings);
-    });
+    getConfig()
+      .then((data) => {
+        setConfig(data);
+        setForm(data.settings);
+      })
+      .catch(() => setLoadError(true));
   }, []);
 
   useEffect(() => {
@@ -108,6 +111,17 @@ export default function Admin() {
     const val = e.target.type === "checkbox" ? String(e.target.checked) : e.target.value;
     setForm((f) => ({ ...f, [key]: val }));
   };
+
+  if (loadError) {
+    return (
+      <div className="max-w-2xl mx-auto py-12 text-center">
+        <p className="text-red-600 font-medium mb-2">Failed to load settings</p>
+        <p className="text-sm text-gray-500">
+          The .env file may not exist yet. Check that FreezerTrack is fully installed.
+        </p>
+      </div>
+    );
+  }
 
   if (!config) {
     return (
