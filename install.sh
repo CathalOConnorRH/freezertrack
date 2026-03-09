@@ -125,6 +125,7 @@ fi
 # ── Database migrations ──────────────────────────────────────────────────────
 
 info "Running database migrations..."
+ln -sf "${INSTALL_DIR}/.env" "${INSTALL_DIR}/backend/.env"
 cd "${INSTALL_DIR}/backend"
 "${INSTALL_DIR}/backend/venv/bin/alembic" upgrade head
 ok "Database ready"
