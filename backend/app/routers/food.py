@@ -26,6 +26,16 @@ def list_history(db: Session = Depends(get_db)):
     return db.query(FoodItem).filter(FoodItem.removed_at.isnot(None)).all()
 
 
+@router.get("/search", response_model=list[FoodItemResponse])
+def search_items(q: str, db: Session = Depends(get_db)):
+    return (
+        db.query(FoodItem)
+        .filter(FoodItem.removed_at.is_(None))
+        .filter(FoodItem.name.ilike(f"%{q}%"))
+        .all()
+    )
+
+
 @router.get("/lookup/{barcode}")
 async def lookup_barcode_endpoint(barcode: str):
     return await barcode_service.lookup_barcode(barcode, settings)

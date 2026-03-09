@@ -1,43 +1,101 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { removeItem, lookupBarcode } from "../api/client";
+import { removeItem, lookupBarcode, searchItems } from "../api/client";
 import ScanInput from "../components/ScanInput";
 import CameraScanner from "../components/CameraScanner";
+import { LogIn, LogOut, X } from "lucide-react";
 
 export default function Scanner() {
   const isMobile =
     typeof navigator !== "undefined" && navigator.maxTouchPoints > 0;
-  const [tab, setTab] = useState(isMobile ? "camera" : "usb");
+  const [inputTab, setInputTab] = useState(isMobile ? "camera" : "usb");
+  const [mode, setMode] = useState("out");
   const [result, setResult] = useState(null);
+  const [matches, setMatches] = useState(null);
+  const [removing, setRemoving] = useState(null);
   const navigate = useNavigate();
 
   const handleScan = async (rawString) => {
+    setMatches(null);
+    setResult(null);
+
+    // Try parsing as our QR code JSON (has an id field)
     try {
       const parsed = JSON.parse(rawString);
       if (parsed.id) {
-        await removeItem(parsed.id);
-        setResult({
-          type: "success",
-          message: `${parsed.name || "Item"} removed from freezer`,
-        });
+        if (mode === "out") {
+          await removeItem(parsed.id);
+          setResult({
+            type: "success",
+            message: `${parsed.name || "Item"} removed from freezer`,
+          });
+        } else {
+          setResult({
+            type: "warn",
+            message: `"${parsed.name || "Item"}" is already in the freezer`,
+          });
+        }
         return;
       }
     } catch {
       // Not JSON, treat as retail barcode
     }
 
+    if (mode === "out") {
+      await handleScanOut(rawString);
+    } else {
+      await handleScanIn(rawString);
+    }
+  };
+
+  const handleScanIn = async (barcode) => {
     try {
-      const data = await lookupBarcode(rawString);
+      const data = await lookupBarcode(barcode);
       if (data.found) {
-        navigate("/add", { state: { barcode: rawString, prefill: data } });
+        navigate("/add", { state: { barcode, prefill: data } });
       } else {
-        setResult({
-          type: "warn",
-          message: `No product found for ${rawString}`,
-        });
+        navigate("/add", { state: { barcode, prefill: { name: "", brand: "" } } });
       }
     } catch {
-      setResult({ type: "error", message: "Lookup failed. Try again." });
+      setResult({ type: "error", message: "Barcode lookup failed. Try again." });
+    }
+  };
+
+  const handleScanOut = async (barcode) => {
+    try {
+      const data = await lookupBarcode(barcode);
+      const searchName = data.found ? data.name : barcode;
+
+      const found = await searchItems(searchName);
+
+      if (found.length === 0) {
+        setResult({
+          type: "warn",
+          message: `No items matching "${searchName}" found in freezer`,
+        });
+      } else if (found.length === 1) {
+        await doRemove(found[0]);
+      } else {
+        setMatches(found);
+      }
+    } catch {
+      setResult({ type: "error", message: "Search failed. Try again." });
+    }
+  };
+
+  const doRemove = async (item) => {
+    setRemoving(item.id);
+    try {
+      await removeItem(item.id);
+      setMatches(null);
+      setResult({
+        type: "success",
+        message: `${item.name} (x${item.quantity}) removed from freezer`,
+      });
+    } catch {
+      setResult({ type: "error", message: `Failed to remove ${item.name}` });
+    } finally {
+      setRemoving(null);
     }
   };
 
@@ -51,22 +109,87 @@ export default function Scanner() {
     <div className="max-w-lg mx-auto">
       <h2 className="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Scanner</h2>
 
+      {/* Scan In / Scan Out mode toggle */}
+      <div className="flex gap-2 mb-3">
+        <ModeButton
+          active={mode === "in"}
+          onClick={() => { setMode("in"); setResult(null); setMatches(null); }}
+          icon={<LogIn size={16} />}
+          label="Scan In"
+          color="green"
+        />
+        <ModeButton
+          active={mode === "out"}
+          onClick={() => { setMode("out"); setResult(null); setMatches(null); }}
+          icon={<LogOut size={16} />}
+          label="Scan Out"
+          color="blue"
+        />
+      </div>
+
+      <p className="text-xs text-gray-500 mb-4">
+        {mode === "in"
+          ? "Scan a barcode to add a new item to the freezer."
+          : "Scan a barcode or QR label to remove an item from the freezer."}
+      </p>
+
+      {/* Input method toggle */}
       <div className="flex gap-2 mb-4 sm:mb-6">
         <TabButton
-          active={tab === "camera"}
-          onClick={() => setTab("camera")}
+          active={inputTab === "camera"}
+          onClick={() => setInputTab("camera")}
           label="Camera"
         />
         <TabButton
-          active={tab === "usb"}
-          onClick={() => setTab("usb")}
+          active={inputTab === "usb"}
+          onClick={() => setInputTab("usb")}
           label="USB Scanner"
         />
       </div>
 
-      {tab === "usb" && <ScanInput onScan={handleScan} />}
-      {tab === "camera" && <CameraScanner onScan={handleScan} />}
+      {inputTab === "usb" && <ScanInput onScan={handleScan} />}
+      {inputTab === "camera" && <CameraScanner onScan={handleScan} />}
 
+      {/* Match picker for scan-out with multiple results */}
+      {matches && (
+        <div className="mt-4 bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+            <p className="text-sm font-medium text-gray-700">
+              {matches.length} items found — tap to remove
+            </p>
+            <button
+              onClick={() => setMatches(null)}
+              className="p-1 rounded hover:bg-gray-100"
+            >
+              <X size={16} className="text-gray-400" />
+            </button>
+          </div>
+          <div className="divide-y divide-gray-100 max-h-64 overflow-y-auto">
+            {matches.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => doRemove(item)}
+                disabled={removing === item.id}
+                className="w-full text-left px-4 py-3 hover:bg-gray-50 active:bg-gray-100 flex items-center justify-between gap-3 disabled:opacity-50"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {item.name}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {item.frozen_date} &middot; x{item.quantity}
+                  </p>
+                </div>
+                <span className="text-xs font-medium text-red-600 shrink-0">
+                  {removing === item.id ? "Removing..." : "Remove"}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Result feedback */}
       {result && (
         <div
           className={`mt-4 sm:mt-6 px-4 py-3 rounded-lg border text-sm font-medium ${
@@ -77,6 +200,27 @@ export default function Scanner() {
         </div>
       )}
     </div>
+  );
+}
+
+function ModeButton({ active, onClick, icon, label, color }) {
+  const colors = {
+    green: active
+      ? "bg-green-600 text-white"
+      : "bg-gray-100 text-gray-600 hover:bg-gray-200",
+    blue: active
+      ? "bg-[var(--ice-blue)] text-white"
+      : "bg-gray-100 text-gray-600 hover:bg-gray-200",
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors active:scale-[0.98] ${colors[color]}`}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 

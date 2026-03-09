@@ -15,6 +15,8 @@ export const lookupBarcode = (barcode) =>
   api.get(`/food/lookup/${barcode}`).then((r) => r.data);
 export const printLabel = (id) =>
   api.post(`/labels/${id}/print`).then((r) => r.data);
+export const searchItems = (q) =>
+  api.get("/food/search", { params: { q } }).then((r) => r.data);
 export const getHAState = () => api.get("/ha/state").then((r) => r.data);
 
 export const getConfig = () => api.get("/admin/config").then((r) => r.data);
