@@ -6,6 +6,7 @@ export default function AddItem() {
   const location = useLocation();
   const navigate = useNavigate();
   const prefill = location.state?.prefill;
+  const cameFromScanner = location.state?.barcode != null;
 
   const [form, setForm] = useState({
     name: prefill?.name || "",
@@ -36,7 +37,7 @@ export default function AddItem() {
         notes: form.notes || null,
         auto_print: form.auto_print,
       });
-      navigate("/inventory");
+      navigate(cameFromScanner ? "/scan" : "/");
     } catch (err) {
       alert("Failed to add item");
     } finally {
