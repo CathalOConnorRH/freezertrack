@@ -16,3 +16,13 @@ export const lookupBarcode = (barcode) =>
 export const printLabel = (id) =>
   api.post(`/labels/${id}/print`).then((r) => r.data);
 export const getHAState = () => api.get("/ha/state").then((r) => r.data);
+
+export const getConfig = () => api.get("/admin/config").then((r) => r.data);
+export const updateConfig = (settings) =>
+  api.patch("/admin/config", { settings }).then((r) => r.data);
+export const triggerUpdate = () =>
+  api.post("/admin/update").then((r) => r.data);
+export const getUpdateStatus = () =>
+  api.get("/admin/update/status").then((r) => r.data);
+export const restartService = () =>
+  api.post("/admin/restart").then((r) => r.data);

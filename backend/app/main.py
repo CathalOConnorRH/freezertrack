@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import Base, engine
-from app.routers import food, homeassistant, labels
+from app.routers import admin, food, homeassistant, labels
 
 
 @asynccontextmanager
@@ -26,6 +26,7 @@ app.add_middleware(
 app.include_router(food.router)
 app.include_router(labels.router)
 app.include_router(homeassistant.router)
+app.include_router(admin.router)
 
 
 @app.get("/health")

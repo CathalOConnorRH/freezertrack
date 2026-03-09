@@ -1,15 +1,17 @@
 import { Routes, Route, NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, ScanLine, PlusCircle, Archive } from "lucide-react";
+import { LayoutDashboard, ScanLine, PlusCircle, Archive, Settings } from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Scanner from "./pages/Scanner";
 import AddItem from "./pages/AddItem";
 import Inventory from "./pages/Inventory";
+import Admin from "./pages/Admin";
 
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/scan", label: "Scanner", icon: ScanLine },
   { to: "/add", label: "Add", icon: PlusCircle },
   { to: "/inventory", label: "Inventory", icon: Archive },
+  { to: "/admin", label: "Admin", icon: Settings },
 ];
 
 function NavItem({ to, label, icon: Icon }) {
@@ -61,6 +63,7 @@ export default function App() {
           <Route path="/scan" element={<Scanner />} />
           <Route path="/add" element={<AddItem />} />
           <Route path="/inventory" element={<Inventory />} />
+          <Route path="/admin" element={<Admin />} />
         </Routes>
       </main>
 
