@@ -56,7 +56,11 @@ if [[ -n "${INPUT_CTID}" ]] && pct status "${INPUT_CTID}" &>/dev/null; then
     read -rp "FreezerTrack found in CT ${INPUT_CTID}. Update it? [y/N]: " DO_UPDATE
     if [[ "${DO_UPDATE,,}" == "y" ]]; then
       info "Updating FreezerTrack in CT ${INPUT_CTID}..."
-      pct exec "${INPUT_CTID}" -- bash -c "curl -fsSL ${INSTALL_SCRIPT_URL} | bash"
+      TMPFILE=$(mktemp)
+      curl -fsSL "${INSTALL_SCRIPT_URL}" -o "${TMPFILE}"
+      pct push "${INPUT_CTID}" "${TMPFILE}" /tmp/freezertrack-install.sh
+      rm -f "${TMPFILE}"
+      pct exec "${INPUT_CTID}" -- bash /tmp/freezertrack-install.sh
       ok "Update complete!"
       exit 0
     else
@@ -162,8 +166,19 @@ if ! pct exec "${CTID}" -- ping -c1 -W1 8.8.8.8 &>/dev/null; then
 fi
 ok "Network is up"
 
+info "Preparing container..."
+pct exec "${CTID}" -- bash -c "apt-get update -qq && apt-get install -y -qq curl >/dev/null 2>&1"
+ok "Container ready"
+
+info "Downloading install script..."
+TMPFILE=$(mktemp)
+curl -fsSL "${INSTALL_SCRIPT_URL}" -o "${TMPFILE}"
+pct push "${CTID}" "${TMPFILE}" /tmp/freezertrack-install.sh
+rm -f "${TMPFILE}"
+ok "Install script loaded"
+
 info "Running FreezerTrack installer inside container (this takes a few minutes)..."
-pct exec "${CTID}" -- bash -c "curl -fsSL ${INSTALL_SCRIPT_URL} | bash"
+pct exec "${CTID}" -- bash /tmp/freezertrack-install.sh
 
 # ── Done ─────────────────────────────────────────────────────────────────────
 
