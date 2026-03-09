@@ -166,8 +166,8 @@ if ! pct exec "${CTID}" -- ping -c1 -W1 8.8.8.8 &>/dev/null; then
 fi
 ok "Network is up"
 
-info "Preparing container..."
-pct exec "${CTID}" -- bash -c "apt-get update -qq && apt-get install -y -qq curl >/dev/null 2>&1"
+info "Preparing container (installing curl)..."
+pct exec "${CTID}" -- bash -c "apt-get update && apt-get install -y curl"
 ok "Container ready"
 
 info "Downloading install script..."
