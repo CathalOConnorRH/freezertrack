@@ -12,6 +12,7 @@ export default function AddItem() {
     brand: prefill?.brand || "",
     frozen_date: new Date().toISOString().split("T")[0],
     quantity: 1,
+    containers: 1,
     notes: "",
     auto_print: true,
   });
@@ -31,6 +32,7 @@ export default function AddItem() {
         name: form.name,
         frozen_date: form.frozen_date,
         quantity: Number(form.quantity),
+        containers: Number(form.containers),
         notes: form.notes || null,
         auto_print: form.auto_print,
       });
@@ -41,6 +43,9 @@ export default function AddItem() {
       setSubmitting(false);
     }
   };
+
+  const totalItems = Number(form.containers) || 1;
+  const servingsEach = Number(form.quantity) || 1;
 
   return (
     <div className="max-w-lg mx-auto">
@@ -89,18 +94,40 @@ export default function AddItem() {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Quantity
-          </label>
-          <input
-            type="number"
-            min="1"
-            value={form.quantity}
-            onChange={set("quantity")}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
-          />
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Servings per container
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={form.quantity}
+              onChange={set("quantity")}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Number of containers
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={form.containers}
+              onChange={set("containers")}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
+            />
+          </div>
         </div>
+
+        {totalItems > 1 && (
+          <p className="text-sm text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+            This will add <strong>{totalItems} items</strong> to the freezer
+            ({servingsEach} serving{servingsEach > 1 ? "s" : ""} each)
+            {form.auto_print && <> and print <strong>{totalItems} labels</strong></>}.
+          </p>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -121,7 +148,9 @@ export default function AddItem() {
             onChange={set("auto_print")}
             className="w-4 h-4 rounded text-[var(--ice-blue)] focus:ring-[var(--ice-blue)]"
           />
-          <span className="text-sm text-gray-700">Print label</span>
+          <span className="text-sm text-gray-700">
+            Print label{totalItems > 1 ? "s" : ""}
+          </span>
         </label>
 
         <button
@@ -129,7 +158,9 @@ export default function AddItem() {
           disabled={submitting}
           className="w-full py-3 bg-[var(--ice-blue)] text-white rounded-lg font-medium hover:bg-[#4a9bd9] transition-colors disabled:opacity-50"
         >
-          {submitting ? "Adding & Printing..." : "Add to Freezer"}
+          {submitting
+            ? `Adding ${totalItems > 1 ? `${totalItems} items` : "item"}...`
+            : `Add ${totalItems > 1 ? `${totalItems} containers` : ""} to Freezer`}
         </button>
       </form>
     </div>

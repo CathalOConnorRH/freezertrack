@@ -7,6 +7,7 @@ class FoodItemCreate(BaseModel):
     name: str
     frozen_date: date
     quantity: int = 1
+    containers: int = 1
     notes: str | None = None
     auto_print: bool = True
 

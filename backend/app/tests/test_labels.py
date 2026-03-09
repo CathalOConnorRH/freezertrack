@@ -11,7 +11,7 @@ def test_preview_returns_png(client):
         "/api/food",
         json={"name": "Test Item", "frozen_date": str(date.today())},
     )
-    item_id = resp.json()["id"]
+    item_id = resp.json()["items"][0]["id"]
 
     preview = client.get(f"/api/labels/{item_id}/preview")
     assert preview.status_code == 200
@@ -38,7 +38,7 @@ def test_print_label_endpoint(client, mock_printer):
         "/api/food",
         json={"name": "Print Test", "frozen_date": str(date.today())},
     )
-    item_id = resp.json()["id"]
+    item_id = resp.json()["items"][0]["id"]
 
     mock_printer.reset_mock()
     print_resp = client.post(f"/api/labels/{item_id}/print")

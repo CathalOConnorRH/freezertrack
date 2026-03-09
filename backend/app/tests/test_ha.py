@@ -7,7 +7,7 @@ def test_ha_state_counts_active_items(client):
     client.post("/api/food", json={"name": "Fresh", "frozen_date": str(date.today() - timedelta(days=7))})
     client.post("/api/food", json={"name": "Old", "frozen_date": str(date.today() - timedelta(days=100))})
     resp3 = client.post("/api/food", json={"name": "Removed", "frozen_date": str(date.today())})
-    client.post(f"/api/food/{resp3.json()['id']}/remove")
+    client.post(f"/api/food/{resp3.json()['items'][0]['id']}/remove")
 
     state = client.get("/api/ha/state").json()
     assert state["total_items"] == 2

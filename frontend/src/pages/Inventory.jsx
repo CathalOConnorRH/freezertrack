@@ -10,6 +10,8 @@ export default function Inventory() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("date");
   const [selected, setSelected] = useState(null);
+  const [reprinting, setReprinting] = useState(false);
+  const [reprintMsg, setReprintMsg] = useState(null);
 
   const fetchData = () => {
     getItems().then(setItems).catch(() => {});
@@ -38,8 +40,16 @@ export default function Inventory() {
   };
 
   const handleReprint = async (item) => {
-    await printLabel(item.id);
-    alert("Label sent to printer");
+    setReprinting(true);
+    setReprintMsg(null);
+    try {
+      await printLabel(item.id);
+      setReprintMsg({ type: "ok", text: "Label sent to printer" });
+    } catch {
+      setReprintMsg({ type: "err", text: "Failed to print label" });
+    } finally {
+      setReprinting(false);
+    }
   };
 
   const handleDelete = async (item) => {
@@ -83,7 +93,7 @@ export default function Inventory() {
           <FoodCard
             key={item.id}
             item={item}
-            onClick={(i) => tab === "active" && setSelected(i)}
+            onClick={(i) => { if (tab === "active") { setSelected(i); setReprintMsg(null); } }}
           />
         ))}
       </div>
@@ -110,6 +120,15 @@ export default function Inventory() {
               {selected.notes && <p>Notes: {selected.notes}</p>}
               <p className="text-xs text-gray-400">ID: {selected.id.slice(0, 8)}</p>
             </div>
+            {reprintMsg && (
+              <div className={`mb-4 px-3 py-2 rounded-lg text-sm font-medium ${
+                reprintMsg.type === "ok"
+                  ? "bg-green-50 text-green-700"
+                  : "bg-red-50 text-red-700"
+              }`}>
+                {reprintMsg.text}
+              </div>
+            )}
             <div className="flex gap-3">
               <button
                 onClick={() => handleRemove(selected)}
@@ -119,9 +138,10 @@ export default function Inventory() {
               </button>
               <button
                 onClick={() => handleReprint(selected)}
-                className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200"
+                disabled={reprinting}
+                className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 disabled:opacity-50"
               >
-                Reprint
+                {reprinting ? "Printing..." : "Reprint"}
               </button>
               <button
                 onClick={() => handleDelete(selected)}
