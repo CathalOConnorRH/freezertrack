@@ -153,8 +153,14 @@ server {
         proxy_set_header Host $host;
     }
 
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
     location / {
         try_files $uri /index.html;
+        add_header Cache-Control "no-cache";
     }
 }
 NGINX
