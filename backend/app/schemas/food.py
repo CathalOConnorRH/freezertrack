@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict
 
 class FoodItemCreate(BaseModel):
     name: str
+    brand: str | None = None
     frozen_date: date
     quantity: int = 1
     containers: int = 1
@@ -14,6 +15,7 @@ class FoodItemCreate(BaseModel):
 
 class FoodItemUpdate(BaseModel):
     name: str | None = None
+    brand: str | None = None
     frozen_date: date | None = None
     quantity: int | None = None
     notes: str | None = None
@@ -24,6 +26,7 @@ class FoodItemResponse(BaseModel):
 
     id: str
     name: str
+    brand: str | None
     frozen_date: date
     quantity: int
     notes: str | None

@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -26,12 +27,44 @@ def list_history(db: Session = Depends(get_db)):
     return db.query(FoodItem).filter(FoodItem.removed_at.isnot(None)).all()
 
 
+@router.get("/grouped")
+def list_grouped(db: Session = Depends(get_db)):
+    """Active items grouped by name. Each group shows total containers and oldest date."""
+    items = db.query(FoodItem).filter(FoodItem.removed_at.is_(None)).all()
+    groups: dict[str, dict] = {}
+    for item in items:
+        key = item.name.lower()
+        if key not in groups:
+            groups[key] = {
+                "name": item.name,
+                "brand": item.brand,
+                "count": 0,
+                "total_servings": 0,
+                "oldest_date": str(item.frozen_date),
+                "newest_date": str(item.frozen_date),
+                "oldest_id": item.id,
+                "items": [],
+            }
+        g = groups[key]
+        g["count"] += 1
+        g["total_servings"] += item.quantity
+        if str(item.frozen_date) < g["oldest_date"]:
+            g["oldest_date"] = str(item.frozen_date)
+            g["oldest_id"] = item.id
+        if str(item.frozen_date) > g["newest_date"]:
+            g["newest_date"] = str(item.frozen_date)
+        g["items"].append(FoodItemResponse.model_validate(item).model_dump())
+    return sorted(groups.values(), key=lambda g: g["newest_date"], reverse=True)
+
+
 @router.get("/search", response_model=list[FoodItemResponse])
 def search_items(q: str, db: Session = Depends(get_db)):
     return (
         db.query(FoodItem)
         .filter(FoodItem.removed_at.is_(None))
-        .filter(FoodItem.name.ilike(f"%{q}%"))
+        .filter(
+            or_(FoodItem.name.ilike(f"%{q}%"), FoodItem.brand.ilike(f"%{q}%"))
+        )
         .all()
     )
 
@@ -52,6 +85,7 @@ def create_item(payload: FoodItemCreate, db: Session = Depends(get_db)):
         item = FoodItem(
             id=item_id,
             name=payload.name,
+            brand=payload.brand,
             frozen_date=payload.frozen_date,
             quantity=payload.quantity,
             notes=payload.notes,
@@ -121,6 +155,30 @@ def remove_item(item_id: str, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(item)
     return item
+
+
+@router.post("/{item_id}/decrement")
+def decrement_item(item_id: str, db: Session = Depends(get_db)):
+    item = db.query(FoodItem).filter(FoodItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    if item.removed_at is not None:
+        raise HTTPException(status_code=400, detail="Item already removed")
+
+    removed = False
+    if item.quantity <= 1:
+        item.removed_at = datetime.now(timezone.utc)
+        removed = True
+    else:
+        item.quantity -= 1
+
+    db.commit()
+    db.refresh(item)
+    return {
+        "item": FoodItemResponse.model_validate(item).model_dump(),
+        "remaining": item.quantity,
+        "removed": removed,
+    }
 
 
 @router.delete("/{item_id}", status_code=204)

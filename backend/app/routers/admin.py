@@ -1,12 +1,21 @@
+import csv
+import io
+import json
 import os
+import shutil
 import subprocess
 import threading
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.database import get_db
+from app.models.food import FoodItem
+from app.schemas.food import FoodItemResponse
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -69,6 +78,18 @@ def _write_env(data: dict) -> None:
         f.write("\n".join(lines) + "\n")
 
 
+def _get_db_path() -> str:
+    url = settings.DATABASE_URL
+    if url.startswith("sqlite:////"):
+        return url[len("sqlite:////") :]
+    if url.startswith("sqlite:///"):
+        return url[len("sqlite:///") :]
+    return ""
+
+
+# ── Config ───────────────────────────────────────────────────────────────────
+
+
 @router.get("/config")
 def get_config():
     try:
@@ -111,6 +132,110 @@ def update_config(payload: ConfigUpdate):
         _write_env(env)
 
     return {"updated": changed, "restart_required": bool(changed)}
+
+
+# ── Export ───────────────────────────────────────────────────────────────────
+
+
+@router.get("/export/csv")
+def export_csv(active_only: bool = False, db: Session = Depends(get_db)):
+    query = db.query(FoodItem)
+    if active_only:
+        query = query.filter(FoodItem.removed_at.is_(None))
+    items = query.all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "id", "name", "brand", "frozen_date", "quantity",
+        "notes", "removed_at", "created_at", "qr_code_id",
+    ])
+    for item in items:
+        writer.writerow([
+            item.id, item.name, item.brand or "", str(item.frozen_date),
+            item.quantity, item.notes or "",
+            str(item.removed_at) if item.removed_at else "",
+            str(item.created_at), item.qr_code_id,
+        ])
+
+    output.seek(0)
+    today = datetime.now(timezone.utc).strftime("%Y%m%d")
+    filename = f"freezertrack-export-{today}.csv"
+    return StreamingResponse(
+        output,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+@router.get("/export/json")
+def export_json(active_only: bool = False, db: Session = Depends(get_db)):
+    query = db.query(FoodItem)
+    if active_only:
+        query = query.filter(FoodItem.removed_at.is_(None))
+    items = query.all()
+
+    data = [FoodItemResponse.model_validate(i).model_dump(mode="json") for i in items]
+    output = json.dumps(data, indent=2, default=str)
+
+    today = datetime.now(timezone.utc).strftime("%Y%m%d")
+    filename = f"freezertrack-export-{today}.json"
+    return StreamingResponse(
+        io.StringIO(output),
+        media_type="application/json",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+# ── Backup / Restore ────────────────────────────────────────────────────────
+
+
+@router.get("/backup")
+def download_backup():
+    db_path = _get_db_path()
+    if not db_path or not os.path.exists(db_path):
+        raise HTTPException(status_code=404, detail="Database file not found")
+
+    today = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    filename = f"freezertrack-backup-{today}.db"
+    return FileResponse(
+        db_path,
+        media_type="application/octet-stream",
+        filename=filename,
+    )
+
+
+@router.post("/restore")
+async def restore_backup(file: UploadFile, confirm: bool = False):
+    if not confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="Add ?confirm=true to confirm database replacement",
+        )
+
+    content = await file.read()
+    if not content[:16].startswith(b"SQLite format 3"):
+        raise HTTPException(status_code=400, detail="Invalid SQLite file")
+
+    db_path = _get_db_path()
+    if not db_path:
+        raise HTTPException(status_code=500, detail="Cannot determine database path")
+
+    backup_path = db_path + ".bak"
+    if os.path.exists(db_path):
+        shutil.copy2(db_path, backup_path)
+
+    with open(db_path, "wb") as f:
+        f.write(content)
+
+    return {
+        "success": True,
+        "message": "Database restored. Restart the service to apply.",
+        "backup_of_previous": backup_path,
+    }
+
+
+# ── Update ───────────────────────────────────────────────────────────────────
 
 
 @router.post("/update")

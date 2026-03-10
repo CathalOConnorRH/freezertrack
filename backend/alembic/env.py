@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import settings  # noqa: E402
 from app.database import Base  # noqa: E402
-from app.models.food import FoodItem  # noqa: E402, F401
+from app.models.food import BarcodeCache, FoodItem  # noqa: E402, F401
 
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 target_metadata = Base.metadata

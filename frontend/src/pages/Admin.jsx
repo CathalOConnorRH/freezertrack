@@ -5,8 +5,9 @@ import {
   triggerUpdate,
   getUpdateStatus,
   restartService,
+  restoreBackup,
 } from "../api/client";
-import { RefreshCw, Save, RotateCcw, Download } from "lucide-react";
+import { RefreshCw, Save, RotateCcw, Download, DatabaseBackup, FileDown, Upload } from "lucide-react";
 
 const FIELD_META = {
   NIIMBOT_MAC: { label: "Printer Bluetooth MAC", placeholder: "AA:BB:CC:DD:EE:FF" },
@@ -218,6 +219,79 @@ export default function Admin() {
             <RotateCcw size={16} />
             {restarting ? "Restarting..." : "Restart Service"}
           </button>
+        </div>
+      </section>
+
+      {/* Data Management */}
+      <section className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 mb-4 sm:mb-6">
+        <h3 className="text-base sm:text-lg font-semibold mb-4">Data Management</h3>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mb-4">
+          <a
+            href="/api/admin/export/csv"
+            download
+            className="flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 active:scale-[0.98] text-sm"
+          >
+            <FileDown size={16} />
+            Export CSV
+          </a>
+          <a
+            href="/api/admin/export/json"
+            download
+            className="flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 active:scale-[0.98] text-sm"
+          >
+            <FileDown size={16} />
+            Export JSON
+          </a>
+          <a
+            href="/api/admin/export/csv?active_only=true"
+            download
+            className="flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-gray-50 text-gray-500 rounded-lg font-medium hover:bg-gray-100 active:scale-[0.98] text-xs"
+          >
+            CSV (active only)
+          </a>
+          <a
+            href="/api/admin/export/json?active_only=true"
+            download
+            className="flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-gray-50 text-gray-500 rounded-lg font-medium hover:bg-gray-100 active:scale-[0.98] text-xs"
+          >
+            JSON (active only)
+          </a>
+        </div>
+
+        <div className="border-t border-gray-100 pt-4">
+          <h4 className="text-sm font-medium text-gray-700 mb-3">Database Backup</h4>
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <a
+              href="/api/admin/backup"
+              download
+              className="flex-1 flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-[var(--ice-blue)] text-white rounded-lg font-medium hover:bg-[#4a9bd9] active:scale-[0.98] text-sm"
+            >
+              <Download size={16} />
+              Download Backup
+            </a>
+            <label className="flex-1 flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 active:scale-[0.98] text-sm cursor-pointer">
+              <Upload size={16} />
+              Restore Backup
+              <input
+                type="file"
+                accept=".db"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  if (!confirm("This will REPLACE all current data with the backup. Are you sure?")) return;
+                  try {
+                    const res = await restoreBackup(file);
+                    setSaveMsg({ type: "ok", text: res.message });
+                  } catch {
+                    setSaveMsg({ type: "err", text: "Failed to restore backup." });
+                  }
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </div>
         </div>
       </section>
 

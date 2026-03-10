@@ -5,9 +5,12 @@ const api = axios.create({
 });
 
 export const getItems = () => api.get("/food").then((r) => r.data);
+export const getGroupedItems = () => api.get("/food/grouped").then((r) => r.data);
 export const getHistory = () => api.get("/food/history").then((r) => r.data);
 export const createItem = (data) => api.post("/food", data).then((r) => r.data);
 export const removeItem = (id) => api.post(`/food/${id}/remove`).then((r) => r.data);
+export const decrementItem = (id) =>
+  api.post(`/food/${id}/decrement`).then((r) => r.data);
 export const updateItem = (id, data) =>
   api.patch(`/food/${id}`, data).then((r) => r.data);
 export const deleteItem = (id) => api.delete(`/food/${id}`);
@@ -28,3 +31,8 @@ export const getUpdateStatus = () =>
   api.get("/admin/update/status").then((r) => r.data);
 export const restartService = () =>
   api.post("/admin/restart").then((r) => r.data);
+export const restoreBackup = (file) => {
+  const form = new FormData();
+  form.append("file", file);
+  return api.post("/admin/restore?confirm=true", form).then((r) => r.data);
+};

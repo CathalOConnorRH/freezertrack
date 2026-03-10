@@ -31,6 +31,7 @@ export default function AddItem() {
     try {
       await createItem({
         name: form.name,
+        brand: form.brand || null,
         frozen_date: form.frozen_date,
         quantity: Number(form.quantity),
         containers: Number(form.containers),

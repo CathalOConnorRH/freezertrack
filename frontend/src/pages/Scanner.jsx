@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { removeItem, lookupBarcode, searchItems } from "../api/client";
+import { removeItem, decrementItem, lookupBarcode, searchItems } from "../api/client";
 import ScanInput from "../components/ScanInput";
 import CameraScanner from "../components/CameraScanner";
 import { LogIn, LogOut, X } from "lucide-react";
@@ -80,6 +80,24 @@ export default function Scanner() {
       }
     } catch {
       setResult({ type: "error", message: "Search failed. Try again." });
+    }
+  };
+
+  const doDecrement = async (item) => {
+    setRemoving(item.id);
+    try {
+      const res = await decrementItem(item.id);
+      setMatches(null);
+      setResult({
+        type: "success",
+        message: res.removed
+          ? `${item.name} — last serving used, container removed`
+          : `${item.name} — 1 serving used (${res.remaining} left)`,
+      });
+    } catch {
+      setResult({ type: "error", message: `Failed to decrement ${item.name}` });
+    } finally {
+      setRemoving(null);
     }
   };
 
@@ -180,9 +198,19 @@ export default function Scanner() {
                     {item.frozen_date} &middot; x{item.quantity}
                   </p>
                 </div>
-                <span className="text-xs font-medium text-red-600 shrink-0">
-                  {removing === item.id ? "Removing..." : "Remove"}
-                </span>
+                <div className="flex gap-2 shrink-0">
+                  {item.quantity > 1 && (
+                    <span
+                      onClick={(e) => { e.stopPropagation(); doDecrement(item); }}
+                      className="text-xs font-medium text-amber-600 cursor-pointer hover:underline"
+                    >
+                      -1
+                    </span>
+                  )}
+                  <span className="text-xs font-medium text-red-600">
+                    {removing === item.id ? "..." : "Remove"}
+                  </span>
+                </div>
               </button>
             ))}
           </div>
