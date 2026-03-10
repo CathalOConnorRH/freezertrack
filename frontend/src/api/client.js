@@ -41,6 +41,17 @@ export const deleteShoppingItem = (id) => api.delete(`/shopping/${id}`);
 export const suggestShoppingItems = () =>
   api.post("/shopping/suggest").then((r) => r.data);
 
+export const getFreezers = () => api.get("/freezers").then((r) => r.data);
+export const createFreezer = (data) =>
+  api.post("/freezers", data).then((r) => r.data);
+export const updateFreezer = (id, data) =>
+  api.patch(`/freezers/${id}`, data).then((r) => r.data);
+export const deleteFreezer = (id) => api.delete(`/freezers/${id}`);
+export const getPrinterStatus = () =>
+  api.get("/labels/printer/status").then((r) => r.data);
+export const invalidateLabelCache = () =>
+  api.post("/labels/invalidate").then((r) => r.data);
+
 export const getConfig = () => api.get("/admin/config").then((r) => r.data);
 export const updateConfig = (settings) =>
   api.patch("/admin/config", { settings }).then((r) => r.data);

@@ -1,3 +1,4 @@
+import glob
 import os
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -15,9 +16,9 @@ router = APIRouter(prefix="/api/labels", tags=["labels"])
 DATA_DIR = os.environ.get("LABEL_DATA_DIR", os.path.join("data", "labels"))
 
 
-def _ensure_label(item: FoodItem) -> str:
+def _ensure_label(item: FoodItem, force: bool = False) -> str:
     label_path = os.path.join(DATA_DIR, f"{item.id}.png")
-    if os.path.exists(label_path):
+    if not force and os.path.exists(label_path):
         return label_path
 
     qr_path = os.path.join(DATA_DIR, f"{item.id}_qr.png")
@@ -33,6 +34,20 @@ def _ensure_label(item: FoodItem) -> str:
     item_resp = FoodItemResponse.model_validate(item)
     label_image.compose_label(item_resp, qr_path, label_path)
     return label_path
+
+
+@router.get("/printer/status")
+def printer_status():
+    return print_service.check_printer(settings.NIIMBOT_MAC)
+
+
+@router.post("/invalidate")
+def invalidate_label_cache():
+    count = 0
+    for f in glob.glob(os.path.join(DATA_DIR, "*.png")):
+        os.remove(f)
+        count += 1
+    return {"deleted": count}
 
 
 @router.get("/{item_id}/preview")
@@ -51,6 +66,6 @@ def print_label_endpoint(item_id: str, db: Session = Depends(get_db)):
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
-    label_path = _ensure_label(item)
+    label_path = _ensure_label(item, force=True)
     result = print_service.print_label(label_path, settings.NIIMBOT_MAC)
     return {"printed": True, "success": result}

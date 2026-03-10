@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     ALERT_DAYS_FROZEN: int = 90
     LOW_STOCK_THRESHOLD: int = 5
     SECRET_KEY: str = "changeme"
+    LABEL_WIDTH: int = 400
+    LABEL_HEIGHT: int = 240
+    LABEL_FONT_SIZE: int = 22
+    LABEL_SHOW_NOTES: bool = False
+    LABEL_SHOW_BRAND: bool = True
+    LABEL_SHOW_CATEGORY: bool = False
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

@@ -26,6 +26,7 @@ class FoodItemCreate(BaseModel):
     quantity: int = 1
     containers: int = 1
     shelf_life_days: int | None = None
+    freezer_id: str | None = None
     notes: str | None = None
     auto_print: bool = True
 
@@ -52,6 +53,7 @@ class FoodItemResponse(BaseModel):
     shelf_life_days: int | None
     notes: str | None
     photo_path: str | None
+    freezer_id: str | None
     removed_at: datetime | None
     qr_code_id: str
     created_at: datetime

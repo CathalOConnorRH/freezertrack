@@ -172,6 +172,7 @@ def create_item(payload: FoodItemCreate, db: Session = Depends(get_db)):
             quantity=payload.quantity,
             shelf_life_days=shelf_life,
             notes=payload.notes,
+            freezer_id=payload.freezer_id,
             qr_code_id=item_id,
         )
         db.add(item)

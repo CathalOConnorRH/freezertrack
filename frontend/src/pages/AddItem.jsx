@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { createItem, getCategories, uploadPhoto } from "../api/client";
+import { createItem, getCategories, getFreezers, uploadPhoto } from "../api/client";
 
 const SHELF_LIFE_MAP = {
   meat: 120, poultry: 180, fish: 90, vegetables: 240, fruit: 240,
@@ -14,6 +14,7 @@ export default function AddItem() {
   const cameFromScanner = location.state?.barcode != null;
 
   const [categories, setCategories] = useState([]);
+  const [freezers, setFreezers] = useState([]);
   const [form, setForm] = useState({
     name: prefill?.name || "",
     brand: prefill?.brand || "",
@@ -22,6 +23,7 @@ export default function AddItem() {
     quantity: 1,
     containers: 1,
     shelf_life_days: "",
+    freezer_id: "",
     notes: "",
     auto_print: true,
   });
@@ -30,6 +32,7 @@ export default function AddItem() {
 
   useEffect(() => {
     getCategories().then(setCategories).catch(() => {});
+    getFreezers().then(setFreezers).catch(() => {});
   }, []);
 
   const set = (field) => (e) =>
@@ -55,6 +58,7 @@ export default function AddItem() {
         quantity: Number(form.quantity),
         containers: Number(form.containers),
         shelf_life_days: form.shelf_life_days ? Number(form.shelf_life_days) : null,
+        freezer_id: form.freezer_id || null,
         notes: form.notes || null,
         auto_print: form.auto_print,
       });
@@ -159,6 +163,16 @@ export default function AddItem() {
             ({servingsEach} serving{servingsEach > 1 ? "s" : ""} each)
             {form.auto_print && <> and print <strong>{totalItems} labels</strong></>}.
           </p>
+        )}
+
+        {freezers.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Freezer</label>
+            <select value={form.freezer_id} onChange={set("freezer_id")} className={inputCls}>
+              <option value="">Default</option>
+              {freezers.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+          </div>
         )}
 
         <div>

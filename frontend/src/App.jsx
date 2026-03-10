@@ -3,6 +3,7 @@ import {
   LayoutDashboard, ScanLine, PlusCircle, Archive,
   BarChart3, ShoppingCart, Settings,
 } from "lucide-react";
+import useTheme from "./hooks/useTheme";
 import Dashboard from "./pages/Dashboard";
 import Scanner from "./pages/Scanner";
 import AddItem from "./pages/AddItem";
@@ -45,6 +46,7 @@ function NavItem({ to, label, icon: Icon }) {
 
 export default function App() {
   const location = useLocation();
+  useTheme();
 
   return (
     <div className="min-h-screen min-h-[100dvh] flex flex-col md:flex-row">
@@ -88,7 +90,7 @@ export default function App() {
       </main>
 
       {/* Mobile Bottom Tab Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around px-1 pt-2 safe-bottom z-50">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[var(--surface)] border-t border-[var(--border)] flex justify-around px-1 pt-2 safe-bottom z-50">
         {NAV.map(({ to, label, icon: Icon }) => {
           const active =
             to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);
