@@ -1,7 +1,7 @@
 import { Routes, Route, NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, ScanLine, PlusCircle, Archive,
-  BarChart3, ShoppingCart, Settings,
+  BarChart3, ShoppingCart, Tag, Settings,
 } from "lucide-react";
 import useTheme from "./hooks/useTheme";
 import Dashboard from "./pages/Dashboard";
@@ -10,6 +10,7 @@ import AddItem from "./pages/AddItem";
 import Inventory from "./pages/Inventory";
 import Statistics from "./pages/Statistics";
 import ShoppingList from "./pages/ShoppingList";
+import LabelDesigner from "./pages/LabelDesigner";
 import Admin from "./pages/Admin";
 
 const NAV = [
@@ -22,6 +23,7 @@ const NAV = [
 
 const SIDEBAR_ONLY = [
   { to: "/stats", label: "Statistics", icon: BarChart3 },
+  { to: "/labels", label: "Label Designer", icon: Tag },
   { to: "/admin", label: "Admin", icon: Settings },
 ];
 
@@ -70,6 +72,9 @@ export default function App() {
           <NavLink to="/stats" className={({ isActive }) => isActive ? "text-[var(--ice-blue)]" : "text-gray-400"}>
             <BarChart3 size={20} />
           </NavLink>
+          <NavLink to="/labels" className={({ isActive }) => isActive ? "text-[var(--ice-blue)]" : "text-gray-400"}>
+            <Tag size={20} />
+          </NavLink>
           <NavLink to="/admin" className={({ isActive }) => isActive ? "text-[var(--ice-blue)]" : "text-gray-400"}>
             <Settings size={20} />
           </NavLink>
@@ -84,6 +89,7 @@ export default function App() {
           <Route path="/add" element={<AddItem />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/stats" element={<Statistics />} />
+          <Route path="/labels" element={<LabelDesigner />} />
           <Route path="/shopping" element={<ShoppingList />} />
           <Route path="/admin" element={<Admin />} />
         </Routes>
