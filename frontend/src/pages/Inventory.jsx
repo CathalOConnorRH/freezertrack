@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import {
   getGroupedItems,
   getHistory,
+  getCategories,
   removeItem,
   decrementItem,
+  readdItem,
   printLabel,
   deleteItem,
 } from "../api/client";
@@ -29,20 +31,24 @@ function ageBadge(dateStr) {
 export default function Inventory() {
   const [groups, setGroups] = useState([]);
   const [history, setHistory] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [tab, setTab] = useState("active");
   const [search, setSearch] = useState("");
+  const [catFilter, setCatFilter] = useState("");
   const [selected, setSelected] = useState(null);
+  const [selectedHistory, setSelectedHistory] = useState(null);
   const [actionMsg, setActionMsg] = useState(null);
   const [acting, setActing] = useState(false);
 
   const fetchData = () => {
-    getGroupedItems().then(setGroups).catch(() => {});
+    getGroupedItems(catFilter || undefined).then(setGroups).catch(() => {});
     getHistory().then(setHistory).catch(() => {});
+    getCategories().then(setCategories).catch(() => {});
   };
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [catFilter]);
 
   const totalActive = groups.reduce((sum, g) => sum + g.count, 0);
 
@@ -120,14 +126,24 @@ export default function Inventory() {
         />
       </div>
 
-      <div className="mb-3 sm:mb-4">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-3 sm:mb-4">
         <input
           type="text"
           placeholder="Search by name or brand..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
+          className="flex-1 border border-gray-300 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
         />
+        {tab === "active" && categories.length > 0 && (
+          <select
+            value={catFilter}
+            onChange={(e) => setCatFilter(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white"
+          >
+            <option value="">All Categories</option>
+            {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
       </div>
 
       {tab === "active" && (
@@ -170,9 +186,10 @@ export default function Inventory() {
       {tab === "history" && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
           {filteredHistory.map((item) => (
-            <div
+            <button
               key={item.id}
-              className="bg-white rounded-xl border border-gray-200 p-3.5 sm:p-4 opacity-70"
+              onClick={() => { setSelectedHistory(item); setActionMsg(null); }}
+              className="w-full text-left bg-white rounded-xl border border-gray-200 p-3.5 sm:p-4 opacity-70 hover:opacity-100 hover:shadow-md active:scale-[0.99] transition-all"
             >
               <h3 className="font-semibold text-gray-700 truncate text-[15px] sm:text-base">
                 {item.name}
@@ -181,7 +198,7 @@ export default function Inventory() {
               <p className="text-xs text-gray-500 mt-0.5">
                 Removed {daysAgo(item.removed_at)}
               </p>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -265,6 +282,71 @@ export default function Inventory() {
                 className="w-full py-3 sm:py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 active:scale-[0.98] disabled:opacity-50"
               >
                 Reprint Label
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* History Detail Panel */}
+      {selectedHistory && (
+        <div
+          className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center"
+          onClick={(e) => e.target === e.currentTarget && setSelectedHistory(null)}
+        >
+          <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5 sm:p-6">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-lg font-bold">{selectedHistory.name}</h3>
+                {selectedHistory.brand && (
+                  <p className="text-sm text-gray-500">{selectedHistory.brand}</p>
+                )}
+              </div>
+              <button
+                onClick={() => setSelectedHistory(null)}
+                className="p-1 -m-1 rounded-lg hover:bg-gray-100"
+              >
+                <X size={20} className="text-gray-400" />
+              </button>
+            </div>
+            <div className="space-y-2 text-sm text-gray-600 mb-5">
+              <p>Was frozen: {selectedHistory.frozen_date}</p>
+              <p>Quantity: {selectedHistory.quantity} serving(s)</p>
+              {selectedHistory.category && <p>Category: {selectedHistory.category}</p>}
+              {selectedHistory.notes && <p>Notes: {selectedHistory.notes}</p>}
+            </div>
+            {actionMsg && (
+              <div className={`mb-4 px-3 py-2.5 rounded-lg text-sm font-medium ${
+                actionMsg.type === "ok" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+              }`}>{actionMsg.text}</div>
+            )}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                onClick={async () => {
+                  setActing(true);
+                  try {
+                    await readdItem(selectedHistory.id);
+                    setActionMsg({ type: "ok", text: "Added back to freezer!" });
+                    setSelectedHistory(null);
+                    fetchData();
+                  } catch { setActionMsg({ type: "err", text: "Failed to re-add" }); }
+                  setActing(false);
+                }}
+                disabled={acting}
+                className="flex-1 py-3 sm:py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 active:scale-[0.98] disabled:opacity-50"
+              >
+                Re-add to Freezer
+              </button>
+              <button
+                onClick={async () => {
+                  if (confirm(`Permanently delete ${selectedHistory.name}?`)) {
+                    await deleteItem(selectedHistory.id);
+                    setSelectedHistory(null);
+                    fetchData();
+                  }
+                }}
+                className="py-3 sm:py-2.5 px-4 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 active:scale-[0.98]"
+              >
+                Delete
               </button>
             </div>
           </div>

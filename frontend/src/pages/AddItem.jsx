@@ -1,6 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { createItem } from "../api/client";
+import { createItem, getCategories, uploadPhoto } from "../api/client";
+
+const SHELF_LIFE_MAP = {
+  meat: 120, poultry: 180, fish: 90, vegetables: 240, fruit: 240,
+  "ready meals": 90, soups: 120, bread: 90, desserts: 180, other: 180,
+};
 
 export default function AddItem() {
   const location = useLocation();
@@ -8,38 +13,60 @@ export default function AddItem() {
   const prefill = location.state?.prefill;
   const cameFromScanner = location.state?.barcode != null;
 
+  const [categories, setCategories] = useState([]);
   const [form, setForm] = useState({
     name: prefill?.name || "",
     brand: prefill?.brand || "",
+    category: "",
     frozen_date: new Date().toISOString().split("T")[0],
     quantity: 1,
     containers: 1,
+    shelf_life_days: "",
     notes: "",
     auto_print: true,
   });
+  const [photo, setPhoto] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    getCategories().then(setCategories).catch(() => {});
+  }, []);
+
   const set = (field) => (e) =>
-    setForm((f) => ({
-      ...f,
-      [field]: e.target.type === "checkbox" ? e.target.checked : e.target.value,
-    }));
+    setForm((f) => {
+      const val = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+      const updated = { ...f, [field]: val };
+      if (field === "category" && val && !f.shelf_life_days) {
+        const days = SHELF_LIFE_MAP[val.toLowerCase()];
+        if (days) updated.shelf_life_days = String(days);
+      }
+      return updated;
+    });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      await createItem({
+      const res = await createItem({
         name: form.name,
         brand: form.brand || null,
+        category: form.category || null,
         frozen_date: form.frozen_date,
         quantity: Number(form.quantity),
         containers: Number(form.containers),
+        shelf_life_days: form.shelf_life_days ? Number(form.shelf_life_days) : null,
         notes: form.notes || null,
         auto_print: form.auto_print,
       });
+
+      if (photo && res.items?.length > 0) {
+        for (const item of res.items) {
+          await uploadPhoto(item.id, photo).catch(() => {});
+        }
+      }
+
       navigate(cameFromScanner ? "/scan" : "/", { replace: true });
-    } catch (err) {
+    } catch {
       alert("Failed to add item");
     } finally {
       setSubmitting(false);
@@ -67,62 +94,60 @@ export default function AddItem() {
             )}
           </label>
           <input
-            type="text"
-            required
-            value={form.name}
-            onChange={set("name")}
-            className={inputCls}
-            autoComplete="off"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Brand
-          </label>
-          <input
-            type="text"
-            value={form.brand}
-            onChange={set("brand")}
-            className={inputCls}
-            autoComplete="off"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Frozen Date
-          </label>
-          <input
-            type="date"
-            value={form.frozen_date}
-            onChange={set("frozen_date")}
-            className={inputCls}
+            type="text" required value={form.name} onChange={set("name")}
+            className={inputCls} autoComplete="off"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Servings
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Brand</label>
             <input
-              type="number"
-              min="1"
-              value={form.quantity}
-              onChange={set("quantity")}
+              type="text" value={form.brand} onChange={set("brand")}
+              className={inputCls} autoComplete="off"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
+            <input
+              type="text" list="categories" value={form.category} onChange={set("category")}
+              className={inputCls} placeholder="Select or type..."
+            />
+            <datalist id="categories">
+              {categories.map((c) => <option key={c} value={c} />)}
+            </datalist>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Frozen Date</label>
+            <input
+              type="date" value={form.frozen_date} onChange={set("frozen_date")}
               className={inputCls}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Containers
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Shelf Life (days)</label>
             <input
-              type="number"
-              min="1"
-              value={form.containers}
-              onChange={set("containers")}
+              type="number" min="1" value={form.shelf_life_days} onChange={set("shelf_life_days")}
+              className={inputCls} placeholder="Auto from category"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Servings</label>
+            <input
+              type="number" min="1" value={form.quantity} onChange={set("quantity")}
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Containers</label>
+            <input
+              type="number" min="1" value={form.containers} onChange={set("containers")}
               className={inputCls}
             />
           </div>
@@ -132,43 +157,34 @@ export default function AddItem() {
           <p className="text-sm text-gray-500 bg-gray-50 rounded-lg px-3 py-2.5">
             This will add <strong>{totalItems} items</strong> to the freezer
             ({servingsEach} serving{servingsEach > 1 ? "s" : ""} each)
-            {form.auto_print && (
-              <>
-                {" "}
-                and print <strong>{totalItems} labels</strong>
-              </>
-            )}
-            .
+            {form.auto_print && <> and print <strong>{totalItems} labels</strong></>}.
           </p>
         )}
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1.5">
-            Notes
-          </label>
-          <textarea
-            value={form.notes}
-            onChange={set("notes")}
-            rows={3}
-            className={inputCls}
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Notes</label>
+          <textarea value={form.notes} onChange={set("notes")} rows={2} className={inputCls} />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">Photo</label>
+          <input
+            type="file" accept="image/*" capture="environment"
+            onChange={(e) => setPhoto(e.target.files?.[0] || null)}
+            className="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
           />
         </div>
 
         <label className="flex items-center gap-3 cursor-pointer py-1">
           <input
-            type="checkbox"
-            checked={form.auto_print}
-            onChange={set("auto_print")}
+            type="checkbox" checked={form.auto_print} onChange={set("auto_print")}
             className="w-5 h-5 sm:w-4 sm:h-4 rounded text-[var(--ice-blue)] focus:ring-[var(--ice-blue)]"
           />
-          <span className="text-sm text-gray-700">
-            Print label{totalItems > 1 ? "s" : ""}
-          </span>
+          <span className="text-sm text-gray-700">Print label{totalItems > 1 ? "s" : ""}</span>
         </label>
 
         <button
-          type="submit"
-          disabled={submitting}
+          type="submit" disabled={submitting}
           className="w-full py-3.5 sm:py-3 bg-[var(--ice-blue)] text-white rounded-lg font-medium text-base sm:text-sm hover:bg-[#4a9bd9] transition-colors disabled:opacity-50 active:scale-[0.98]"
         >
           {submitting

@@ -4,13 +4,18 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "/api",
 });
 
-export const getItems = () => api.get("/food").then((r) => r.data);
-export const getGroupedItems = () => api.get("/food/grouped").then((r) => r.data);
+export const getItems = (category) =>
+  api.get("/food", { params: category ? { category } : {} }).then((r) => r.data);
+export const getGroupedItems = (category) =>
+  api.get("/food/grouped", { params: category ? { category } : {} }).then((r) => r.data);
 export const getHistory = () => api.get("/food/history").then((r) => r.data);
+export const getCategories = () => api.get("/food/categories").then((r) => r.data);
+export const getStats = () => api.get("/food/stats").then((r) => r.data);
 export const createItem = (data) => api.post("/food", data).then((r) => r.data);
 export const removeItem = (id) => api.post(`/food/${id}/remove`).then((r) => r.data);
 export const decrementItem = (id) =>
   api.post(`/food/${id}/decrement`).then((r) => r.data);
+export const readdItem = (id) => api.post(`/food/${id}/readd`).then((r) => r.data);
 export const updateItem = (id, data) =>
   api.patch(`/food/${id}`, data).then((r) => r.data);
 export const deleteItem = (id) => api.delete(`/food/${id}`);
@@ -20,7 +25,21 @@ export const printLabel = (id) =>
   api.post(`/labels/${id}/print`).then((r) => r.data);
 export const searchItems = (q) =>
   api.get("/food/search", { params: { q } }).then((r) => r.data);
+export const uploadPhoto = (id, file) => {
+  const form = new FormData();
+  form.append("file", file);
+  return api.post(`/food/${id}/photo`, form).then((r) => r.data);
+};
 export const getHAState = () => api.get("/ha/state").then((r) => r.data);
+
+export const getShoppingList = () => api.get("/shopping").then((r) => r.data);
+export const addShoppingItem = (data) =>
+  api.post("/shopping", data).then((r) => r.data);
+export const completeShoppingItem = (id) =>
+  api.post(`/shopping/${id}/complete`).then((r) => r.data);
+export const deleteShoppingItem = (id) => api.delete(`/shopping/${id}`);
+export const suggestShoppingItems = () =>
+  api.post("/shopping/suggest").then((r) => r.data);
 
 export const getConfig = () => api.get("/admin/config").then((r) => r.data);
 export const updateConfig = (settings) =>

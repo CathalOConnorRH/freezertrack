@@ -1,16 +1,26 @@
 import { Routes, Route, NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, ScanLine, PlusCircle, Archive, Settings } from "lucide-react";
+import {
+  LayoutDashboard, ScanLine, PlusCircle, Archive,
+  BarChart3, ShoppingCart, Settings,
+} from "lucide-react";
 import Dashboard from "./pages/Dashboard";
 import Scanner from "./pages/Scanner";
 import AddItem from "./pages/AddItem";
 import Inventory from "./pages/Inventory";
+import Statistics from "./pages/Statistics";
+import ShoppingList from "./pages/ShoppingList";
 import Admin from "./pages/Admin";
 
 const NAV = [
-  { to: "/", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/scan", label: "Scanner", icon: ScanLine },
+  { to: "/", label: "Home", icon: LayoutDashboard },
+  { to: "/scan", label: "Scan", icon: ScanLine },
   { to: "/add", label: "Add", icon: PlusCircle },
-  { to: "/inventory", label: "Inventory", icon: Archive },
+  { to: "/inventory", label: "Items", icon: Archive },
+  { to: "/shopping", label: "Shop", icon: ShoppingCart },
+];
+
+const SIDEBAR_ONLY = [
+  { to: "/stats", label: "Statistics", icon: BarChart3 },
   { to: "/admin", label: "Admin", icon: Settings },
 ];
 
@@ -44,16 +54,24 @@ export default function App() {
           <h1 className="text-xl font-bold tracking-tight">FreezerTrack</h1>
           <p className="text-xs text-gray-400 mt-1">Freezer Inventory</p>
         </div>
-        <nav className="flex flex-col gap-1">
-          {NAV.map((n) => (
+        <nav className="flex flex-col gap-1 flex-1">
+          {[...NAV, ...SIDEBAR_ONLY].map((n) => (
             <NavItem key={n.to} {...n} />
           ))}
         </nav>
       </aside>
 
       {/* Mobile Header */}
-      <header className="md:hidden sticky top-0 z-40 bg-[var(--navy)] text-white px-4 py-3 flex items-center">
+      <header className="md:hidden sticky top-0 z-40 bg-[var(--navy)] text-white px-4 py-3 flex items-center justify-between">
         <h1 className="text-lg font-bold tracking-tight">FreezerTrack</h1>
+        <div className="flex gap-3">
+          <NavLink to="/stats" className={({ isActive }) => isActive ? "text-[var(--ice-blue)]" : "text-gray-400"}>
+            <BarChart3 size={20} />
+          </NavLink>
+          <NavLink to="/admin" className={({ isActive }) => isActive ? "text-[var(--ice-blue)]" : "text-gray-400"}>
+            <Settings size={20} />
+          </NavLink>
+        </div>
       </header>
 
       {/* Main Content */}
@@ -63,12 +81,14 @@ export default function App() {
           <Route path="/scan" element={<Scanner />} />
           <Route path="/add" element={<AddItem />} />
           <Route path="/inventory" element={<Inventory />} />
+          <Route path="/stats" element={<Statistics />} />
+          <Route path="/shopping" element={<ShoppingList />} />
           <Route path="/admin" element={<Admin />} />
         </Routes>
       </main>
 
       {/* Mobile Bottom Tab Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around px-2 pt-2 safe-bottom z-50">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around px-1 pt-2 safe-bottom z-50">
         {NAV.map(({ to, label, icon: Icon }) => {
           const active =
             to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);
@@ -76,11 +96,11 @@ export default function App() {
             <NavLink
               key={to}
               to={to}
-              className={`flex flex-col items-center gap-0.5 min-w-[4rem] py-1.5 text-[11px] font-medium rounded-lg transition-colors ${
+              className={`flex flex-col items-center gap-0.5 min-w-[3.5rem] py-1.5 text-[10px] font-medium rounded-lg transition-colors ${
                 active ? "text-[var(--ice-blue)]" : "text-gray-400"
               }`}
             >
-              <Icon size={22} strokeWidth={active ? 2.5 : 2} />
+              <Icon size={20} strokeWidth={active ? 2.5 : 2} />
               {label}
             </NavLink>
           );

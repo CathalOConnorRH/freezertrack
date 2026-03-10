@@ -1,0 +1,24 @@
+{
+  "name": "FreezerTrack",
+  "short_name": "Freezer",
+  "description": "Freezer inventory tracker with QR label printing and barcode scanning",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1b2a4a",
+  "theme_color": "#1b2a4a",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
