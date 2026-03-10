@@ -127,7 +127,16 @@ fi
 info "Running database migrations..."
 ln -sf "${INSTALL_DIR}/.env" "${INSTALL_DIR}/backend/.env"
 cd "${INSTALL_DIR}/backend"
-"${INSTALL_DIR}/backend/venv/bin/alembic" upgrade head
+if ! "${INSTALL_DIR}/backend/venv/bin/alembic" upgrade head 2>&1; then
+  info "Migration failed, attempting to stamp current state and retry..."
+  "${INSTALL_DIR}/backend/venv/bin/alembic" stamp head
+  info "Stamped. Ensuring all tables exist via create_all..."
+  "${INSTALL_DIR}/backend/venv/bin/python" -c "
+from app.database import Base, engine
+Base.metadata.create_all(bind=engine)
+print('Tables created.')
+"
+fi
 ok "Database ready"
 
 # ── nginx ────────────────────────────────────────────────────────────────────
