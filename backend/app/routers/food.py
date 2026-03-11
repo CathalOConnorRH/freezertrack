@@ -125,12 +125,21 @@ def get_stats(db: Session = Depends(get_db)):
 
     now = datetime.now(timezone.utc)
     weeks = []
+
+    def _make_aware(dt):
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt
+
     for w in range(11, -1, -1):
         start = now - timedelta(weeks=w + 1)
-        end = now - timedelta(weeks=w)
-        added = sum(1 for i in all_items if start <= i.created_at < end)
+        end_dt = now - timedelta(weeks=w)
+        added = sum(1 for i in all_items if start <= _make_aware(i.created_at) < end_dt)
         removed_count = sum(
-            1 for i in removed if i.removed_at and start <= i.removed_at < end
+            1 for i in removed
+            if i.removed_at and start <= _make_aware(i.removed_at) < end_dt
         )
         week_label = (now - timedelta(weeks=w)).strftime("%d %b")
         weeks.append({"week": week_label, "added": added, "removed": removed_count})

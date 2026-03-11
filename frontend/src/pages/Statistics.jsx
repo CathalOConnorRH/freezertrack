@@ -15,10 +15,22 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 export default function Statistics() {
   const [stats, setStats] = useState(null);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
-    getStats().then(setStats).catch(() => {});
+    getStats()
+      .then(setStats)
+      .catch(() => setError(true));
   }, []);
+
+  if (error) {
+    return (
+      <div className="max-w-4xl mx-auto py-12 text-center">
+        <p className="text-red-600 font-medium mb-2">Failed to load statistics</p>
+        <p className="text-sm text-gray-500">The backend may have encountered an error.</p>
+      </div>
+    );
+  }
 
   if (!stats) {
     return (
