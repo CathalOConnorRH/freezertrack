@@ -61,6 +61,23 @@ This uses the [community-scripts/ProxmoxVE](https://github.com/community-scripts
 
 To **update** an existing LXC installation, run the same command again and select "Update".
 
+## USB Barcode Scanner (NetumScan / any HID scanner)
+
+Run a headless barcode scanner service on a separate Pi or machine near your freezer. Scans are sent to FreezerTrack over the network. Works with any USB HID barcode scanner (NetumScan, Tera, Inateck, etc.).
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/CathalOConnorRH/freezertrack/main/scanner/install.sh | sudo bash
+```
+
+The installer will:
+1. Ask for your FreezerTrack server URL (e.g. `http://192.168.1.100`)
+2. List available input devices and let you pick the scanner (or auto-detect)
+3. Install as a systemd service that starts on boot
+
+Monitor scans: `journalctl -u freezertrack-scanner -f`
+
+Change settings: `nano /opt/freezertrack-scanner/config.env && systemctl restart freezertrack-scanner`
+
 ## One-Time Pi Bluetooth Setup
 
 Pair the Niimbot B1 label printer before first use:
