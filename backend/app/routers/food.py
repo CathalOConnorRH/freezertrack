@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models.food import FoodItem, ShoppingItem
+from app.models.food import FoodItem, Freezer, ShoppingItem
 from app.schemas.food import (
     SHELF_LIFE_MAP,
     FoodItemCreate,
@@ -31,10 +31,12 @@ PRESET_CATEGORIES = [
 
 
 @router.get("", response_model=list[FoodItemResponse])
-def list_items(category: str | None = None, db: Session = Depends(get_db)):
+def list_items(category: str | None = None, freezer_id: str | None = None, db: Session = Depends(get_db)):
     q = db.query(FoodItem).filter(FoodItem.removed_at.is_(None))
     if category:
         q = q.filter(FoodItem.category.ilike(category))
+    if freezer_id:
+        q = q.filter(FoodItem.freezer_id == freezer_id)
     return q.all()
 
 
@@ -57,20 +59,29 @@ def list_categories(db: Session = Depends(get_db)):
 
 
 @router.get("/grouped")
-def list_grouped(category: str | None = None, db: Session = Depends(get_db)):
+def list_grouped(category: str | None = None, freezer_id: str | None = None, db: Session = Depends(get_db)):
     q = db.query(FoodItem).filter(FoodItem.removed_at.is_(None))
     if category:
         q = q.filter(FoodItem.category.ilike(category))
+    if freezer_id:
+        q = q.filter(FoodItem.freezer_id == freezer_id)
     items = q.all()
+
+    freezer_map: dict[str | None, str] = {}
+    for f in db.query(Freezer).all():
+        freezer_map[f.id] = f.name
 
     groups: dict[str, dict] = {}
     for item in items:
         key = item.name.lower()
         if key not in groups:
+            freezer_name = freezer_map.get(item.freezer_id) if item.freezer_id else None
             groups[key] = {
                 "name": item.name,
                 "brand": item.brand,
                 "category": item.category,
+                "freezer_id": item.freezer_id,
+                "freezer_name": freezer_name,
                 "count": 0,
                 "total_servings": 0,
                 "oldest_date": str(item.frozen_date),

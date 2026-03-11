@@ -4,10 +4,10 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "/api",
 });
 
-export const getItems = (category) =>
-  api.get("/food", { params: category ? { category } : {} }).then((r) => r.data);
-export const getGroupedItems = (category) =>
-  api.get("/food/grouped", { params: category ? { category } : {} }).then((r) => r.data);
+export const getItems = (filters = {}) =>
+  api.get("/food", { params: filters }).then((r) => r.data);
+export const getGroupedItems = (filters = {}) =>
+  api.get("/food/grouped", { params: filters }).then((r) => r.data);
 export const getHistory = () => api.get("/food/history").then((r) => r.data);
 export const getCategories = () => api.get("/food/categories").then((r) => r.data);
 export const getStats = () => api.get("/food/stats").then((r) => r.data);

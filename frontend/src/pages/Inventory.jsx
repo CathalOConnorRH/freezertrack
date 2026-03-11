@@ -3,6 +3,7 @@ import {
   getGroupedItems,
   getHistory,
   getCategories,
+  getFreezers,
   removeItem,
   decrementItem,
   readdItem,
@@ -32,23 +33,29 @@ export default function Inventory() {
   const [groups, setGroups] = useState([]);
   const [history, setHistory] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [freezers, setFreezers] = useState([]);
   const [tab, setTab] = useState("active");
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("");
+  const [freezerFilter, setFreezerFilter] = useState("");
   const [selected, setSelected] = useState(null);
   const [selectedHistory, setSelectedHistory] = useState(null);
   const [actionMsg, setActionMsg] = useState(null);
   const [acting, setActing] = useState(false);
 
   const fetchData = () => {
-    getGroupedItems(catFilter || undefined).then(setGroups).catch(() => {});
+    const filters = {};
+    if (catFilter) filters.category = catFilter;
+    if (freezerFilter) filters.freezer_id = freezerFilter;
+    getGroupedItems(filters).then(setGroups).catch(() => {});
     getHistory().then(setHistory).catch(() => {});
     getCategories().then(setCategories).catch(() => {});
+    getFreezers().then(setFreezers).catch(() => {});
   };
 
   useEffect(() => {
     fetchData();
-  }, [catFilter]);
+  }, [catFilter, freezerFilter]);
 
   const totalActive = groups.reduce((sum, g) => sum + g.count, 0);
 
@@ -138,10 +145,20 @@ export default function Inventory() {
           <select
             value={catFilter}
             onChange={(e) => setCatFilter(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm bg-white"
+            className="border border-[var(--border)] rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm bg-[var(--surface)]"
           >
             <option value="">All Categories</option>
             {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        )}
+        {tab === "active" && freezers.length > 0 && (
+          <select
+            value={freezerFilter}
+            onChange={(e) => setFreezerFilter(e.target.value)}
+            className="border border-[var(--border)] rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm bg-[var(--surface)]"
+          >
+            <option value="">All Freezers</option>
+            {freezers.map((f) => <option key={f.id} value={f.id}>{f.name} ({f.item_count})</option>)}
           </select>
         )}
       </div>
@@ -165,6 +182,9 @@ export default function Inventory() {
                       <p className="text-xs text-gray-400 truncate">{group.brand}</p>
                     )}
                     <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+                      {group.freezer_name && (
+                        <span className="text-[var(--ice-blue)] mr-1">{group.freezer_name}</span>
+                      )}
                       Oldest: {daysAgo(group.oldest_date)}
                     </p>
                   </div>
@@ -244,6 +264,7 @@ export default function Inventory() {
             </div>
 
             <p className="text-xs text-gray-500 mb-4">
+              {selected.freezer_name && <><span className="text-[var(--ice-blue)]">{selected.freezer_name}</span> &middot; </>}
               Oldest frozen: {selected.oldest_date} &middot; Newest: {selected.newest_date}
             </p>
 
