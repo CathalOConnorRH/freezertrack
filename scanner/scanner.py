@@ -251,6 +251,35 @@ def handle_scan_out(barcode: str, api_url: str, client: httpx.Client) -> tuple[b
         return False, ""
 
 
+CATEGORY_KEYWORDS = {
+    "Meat": ["mince", "beef", "steak", "lamb", "pork", "bacon", "ham", "sausage",
+             "burger", "angus", "sirloin", "chuck"],
+    "Poultry": ["chicken", "turkey", "duck", "kiev", "nugget", "goujons"],
+    "Fish": ["fish", "cod", "haddock", "salmon", "tuna", "prawn", "shrimp",
+             "fillet", "seafood", "omega"],
+    "Vegetables": ["vegetable", "peas", "spinach", "broccoli", "carrot", "corn",
+                   "potato", "chips", "fries", "wedges", "roast potatoes", "garlic"],
+    "Fruit": ["fruit", "berry", "berries", "strawberry", "raspberry", "mango",
+              "blueberry"],
+    "Ready Meals": ["pizza", "lasagne", "curry", "pie", "meal", "kiev",
+                    "enchilada", "burrito", "focaccia"],
+    "Bread": ["bread", "roll", "bun", "brioche", "wrap", "pitta", "naan",
+              "bagel", "croissant", "pastry", "dough", "base"],
+    "Desserts": ["ice cream", "dessert", "cake", "cheesecake", "brownie",
+                 "waffle", "pancake"],
+    "Soups": ["soup", "broth", "stock"],
+}
+
+
+def guess_category(name: str) -> str | None:
+    """Best-effort category from product name keywords."""
+    lower = name.lower()
+    for category, keywords in CATEGORY_KEYWORDS.items():
+        if any(kw in lower for kw in keywords):
+            return category
+    return None
+
+
 def handle_scan_in(barcode: str, api_url: str, client: httpx.Client) -> tuple[bool, str]:
     """Process a barcode for scan-in (add to freezer). Returns (success, item_name)."""
     base = api_url.rstrip("/")
@@ -281,11 +310,14 @@ def handle_scan_in(barcode: str, api_url: str, client: httpx.Client) -> tuple[bo
 
         name = lookup_data.get("name", "Unknown")
         brand = lookup_data.get("brand")
+        category = guess_category(name)
+        if category:
+            log.info(f"Auto-categorised as: {category}")
 
         payload = {
             "name": name,
             "brand": brand,
-            "category": None,
+            "category": category,
             "frozen_date": str(date.today()),
             "quantity": 1,
             "containers": 1,
