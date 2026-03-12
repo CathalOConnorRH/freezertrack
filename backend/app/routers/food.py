@@ -148,7 +148,12 @@ def save_barcode_mapping(payload: BarcodeMapping, db: Session = Depends(get_db))
         )
         db.add(entry)
     db.commit()
-    barcode_service.clear_mem_cache_entry(payload.barcode)
+    barcode_service.store_in_mem_cache(payload.barcode, {
+        "name": payload.name,
+        "brand": payload.brand or "",
+        "source": "manual",
+        "found": True,
+    })
     return {"saved": True, "barcode": payload.barcode}
 
 

@@ -145,6 +145,10 @@ def clear_mem_cache_entry(barcode: str) -> None:
     _mem_cache.pop(barcode, None)
 
 
+def store_in_mem_cache(barcode: str, result: dict) -> None:
+    _mem_store(barcode, result)
+
+
 def clear_cache() -> None:
     _mem_cache.clear()
     try:

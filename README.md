@@ -78,6 +78,8 @@ Monitor scans: `journalctl -u freezertrack-scanner -f`
 
 Change settings: `nano /opt/freezertrack-scanner/config.env && systemctl restart freezertrack-scanner`
 
+The scanner host also runs a **status dashboard** on port 8888 showing connection status, scan history, and a Scan In / Scan Out mode toggle. Open `http://<scanner-ip>:8888` in a browser.
+
 ## Touchscreen Scanner Controller (ESPHome)
 
 Control the USB scanner's mode (Scan In / Scan Out) from a [Waveshare ESP32-S3-Touch-LCD-2.1](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-2.1) round touchscreen, connected to Home Assistant.
@@ -123,10 +125,12 @@ Control the USB scanner's mode (Scan In / Scan Out) from a [Waveshare ESP32-S3-T
 ### How It Works
 
 - The touchscreen shows two buttons: **SCAN IN** (add to freezer) and **SCAN OUT** (remove from freezer).
-- Tapping a button updates a `select` entity in Home Assistant.
-- The scanner service polls HA for the current mode before processing each barcode.
+- Tapping a button updates the scan mode via `PUT /api/scanner/mode` on the FreezerTrack API.
+- The scanner service reads the current mode from the API before processing each barcode.
+- The mode syncs across all clients: touchscreen, web dashboard, scanner dashboard (port 8888), and Home Assistant.
 - After each scan, the result (e.g., "Added: Chicken Breast") is pushed back to the touchscreen display via HA.
-- If HA is unreachable, the scanner falls back to the `--mode` CLI argument.
+- The touchscreen also has a **Settings** page (gear icon) with **Update** and **Restart** buttons for the FreezerTrack server.
+- The display sleeps after 5 minutes of inactivity; touch to wake.
 
 ## One-Time Pi Bluetooth Setup
 
@@ -196,6 +200,41 @@ podman-compose restart nginx
 | `ALERT_DAYS_FROZEN` | `90` | Days before item flagged as old |
 | `LOW_STOCK_THRESHOLD` | `5` | Alert when fewer items than this |
 | `SECRET_KEY` | `changeme` | Application secret key |
+
+## API Endpoints
+
+### Scanner Mode
+
+The scan mode (in/out) is the single source of truth shared across all clients:
+
+```bash
+# Get current mode
+curl https://freezer.local/api/scanner/mode
+
+# Set mode
+curl -X PUT https://freezer.local/api/scanner/mode \
+  -H 'Content-Type: application/json' -d '{"mode": "in"}'
+```
+
+### Auto-Categorise
+
+Assign categories to uncategorised items using keyword matching:
+
+```bash
+curl -X POST https://freezer.local/api/scanner/auto-categorise
+```
+
+### Manual Barcode Mapping
+
+Save a barcode-to-product mapping so future scans resolve it:
+
+```bash
+curl -X POST https://freezer.local/api/food/barcode \
+  -H 'Content-Type: application/json' \
+  -d '{"barcode": "5054269866902", "name": "Fish Fingers", "brand": "Tesco"}'
+```
+
+The Add Item page also has a barcode field with USB scanner and camera support for this.
 
 ## Running Tests
 
