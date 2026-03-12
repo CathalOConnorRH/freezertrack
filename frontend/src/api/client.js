@@ -32,6 +32,10 @@ export const uploadPhoto = (id, file) => {
 };
 export const getHAState = () => api.get("/ha/state").then((r) => r.data);
 
+export const getScannerMode = () => api.get("/scanner/mode").then((r) => r.data);
+export const setScannerMode = (mode) =>
+  api.put("/scanner/mode", { mode }).then((r) => r.data);
+
 export const getShoppingList = () => api.get("/shopping").then((r) => r.data);
 export const addShoppingItem = (data) =>
   api.post("/shopping", data).then((r) => r.data);

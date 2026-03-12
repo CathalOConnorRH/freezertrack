@@ -77,6 +77,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   .badge { font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
   .badge.ok { background: rgba(34,197,94,0.15); color: var(--green); }
   .badge.fail { background: rgba(239,68,68,0.15); color: var(--red); }
+  .mode-toggle { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+  .mode-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border: 2px solid #334155; border-radius: 12px; background: #1e293b; color: #94a3b8; font-family: inherit; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .mode-btn:active { transform: scale(0.97); }
+  .mode-btn.active-in { background: var(--green); color: #fff; border-color: var(--green); }
+  .mode-btn.active-out { background: var(--ice); color: #fff; border-color: var(--ice); }
+  .mode-btn svg { width: 18px; height: 18px; }
   .refresh-note { text-align: center; color: #475569; font-size: 0.75rem; margin-top: 1rem; }
 </style>
 </head>
@@ -88,6 +94,17 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <div class="stat"><div class="num" id="total">-</div><div class="label">Total Scans</div></div>
     <div class="stat"><div class="num" id="success" style="color:#22c55e">-</div><div class="label">Successful</div></div>
     <div class="stat"><div class="num" id="failed" style="color:#ef4444">-</div><div class="label">Failed</div></div>
+  </div>
+
+  <div class="mode-toggle">
+    <button class="mode-btn" id="btn-in" onclick="setMode('in')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+      Scan In
+    </button>
+    <button class="mode-btn" id="btn-out" onclick="setMode('out')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Scan Out
+    </button>
   </div>
 
   <div class="card">
@@ -137,6 +154,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 </div>
 
 <script>
+let apiUrl = '';
+
 function statusDot(ok) {
   return `<span class="dot ${ok ? 'green' : 'red'}"></span>${ok ? 'Connected' : 'Disconnected'}`;
 }
@@ -151,21 +170,56 @@ function relTime(iso) {
   return d.toLocaleTimeString();
 }
 
+function updateModeButtons(mode) {
+  const btnIn = document.getElementById('btn-in');
+  const btnOut = document.getElementById('btn-out');
+  btnIn.className = 'mode-btn' + (mode === 'in' ? ' active-in' : '');
+  btnOut.className = 'mode-btn' + (mode === 'out' ? ' active-out' : '');
+  document.getElementById('mode').textContent = 'Scan ' + (mode || 'out').charAt(0).toUpperCase() + (mode || 'out').slice(1);
+}
+
+async function setMode(m) {
+  updateModeButtons(m);
+  if (!apiUrl) return;
+  try {
+    await fetch(apiUrl.replace(/\\/$/, '') + '/api/scanner/mode', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: m })
+    });
+  } catch {}
+}
+
+async function fetchMode() {
+  if (!apiUrl) return;
+  try {
+    const r = await fetch(apiUrl.replace(/\\/$/, '') + '/api/scanner/mode');
+    if (r.ok) {
+      const d = await r.json();
+      updateModeButtons(d.mode);
+    }
+  } catch {}
+}
+
 async function refresh() {
   try {
     const r = await fetch('/api/status');
     const s = await r.json();
+
+    if (s.api_url && !apiUrl) {
+      apiUrl = s.api_url;
+      fetchMode();
+    }
 
     document.getElementById('total').textContent = s.total_scans;
     document.getElementById('success').textContent = s.successful_scans;
     document.getElementById('failed').textContent = s.failed_scans;
     document.getElementById('api-status').innerHTML = statusDot(s.api_connected);
     document.getElementById('usb-status').innerHTML = statusDot(s.usb_connected);
-    document.getElementById('mode').textContent = 'Scan ' + (s.mode || 'out').charAt(0).toUpperCase() + (s.mode || 'out').slice(1);
     document.getElementById('uptime').textContent = s.uptime_since ? new Date(s.uptime_since).toLocaleString() : '-';
     document.getElementById('last-barcode').textContent = s.last_scan ? (s.last_scan.length > 30 ? s.last_scan.slice(0,30)+'...' : s.last_scan) : 'None';
     document.getElementById('last-result').innerHTML = s.last_scan_result === 'ok'
-      ? '<span class="badge ok">Removed</span>'
+      ? '<span class="badge ok">OK</span>'
       : s.last_scan_result === 'fail'
       ? '<span class="badge fail">Failed</span>'
       : '-';
@@ -186,6 +240,7 @@ async function refresh() {
 
 refresh();
 setInterval(refresh, 3000);
+setInterval(fetchMode, 5000);
 </script>
 </body>
 </html>"""

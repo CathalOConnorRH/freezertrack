@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { removeItem, decrementItem, lookupBarcode, searchItems } from "../api/client";
+import { removeItem, decrementItem, lookupBarcode, searchItems, getScannerMode, setScannerMode } from "../api/client";
 import ScanInput from "../components/ScanInput";
 import CameraScanner from "../components/CameraScanner";
 import { LogIn, LogOut, X } from "lucide-react";
@@ -14,6 +14,21 @@ export default function Scanner() {
   const [matches, setMatches] = useState(null);
   const [removing, setRemoving] = useState(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    getScannerMode().then((s) => setMode(s.mode)).catch(() => {});
+    const id = setInterval(() => {
+      getScannerMode().then((s) => setMode(s.mode)).catch(() => {});
+    }, 3000);
+    return () => clearInterval(id);
+  }, []);
+
+  const changeMode = useCallback((m) => {
+    setMode(m);
+    setResult(null);
+    setMatches(null);
+    setScannerMode(m).catch(() => {});
+  }, []);
 
   const handleScan = async (rawString) => {
     setMatches(null);
@@ -131,14 +146,14 @@ export default function Scanner() {
       <div className="flex gap-2 mb-3">
         <ModeButton
           active={mode === "in"}
-          onClick={() => { setMode("in"); setResult(null); setMatches(null); }}
+          onClick={() => changeMode("in")}
           icon={<LogIn size={16} />}
           label="Scan In"
           color="green"
         />
         <ModeButton
           active={mode === "out"}
-          onClick={() => { setMode("out"); setResult(null); setMatches(null); }}
+          onClick={() => changeMode("out")}
           icon={<LogOut size={16} />}
           label="Scan Out"
           color="blue"

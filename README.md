@@ -78,6 +78,56 @@ Monitor scans: `journalctl -u freezertrack-scanner -f`
 
 Change settings: `nano /opt/freezertrack-scanner/config.env && systemctl restart freezertrack-scanner`
 
+## Touchscreen Scanner Controller (ESPHome)
+
+Control the USB scanner's mode (Scan In / Scan Out) from a [Waveshare ESP32-S3-Touch-LCD-2.1](https://www.waveshare.com/wiki/ESP32-S3-Touch-LCD-2.1) round touchscreen, connected to Home Assistant.
+
+### Hardware
+
+- Waveshare ESP32-S3-Touch-LCD-2.1 (480x480, ST7701S + CST820)
+- USB barcode scanner connected to a separate Pi (existing scanner service)
+
+### Setup
+
+1. **Install ESPHome** (if not already):
+   ```bash
+   pip install esphome
+   # or via Home Assistant add-on
+   ```
+
+2. **Configure secrets** — copy and fill in `esphome/secrets.yaml`:
+   ```bash
+   cd esphome
+   cp secrets.yaml.example secrets.yaml   # or just edit secrets.yaml directly
+   nano secrets.yaml
+   ```
+
+3. **Flash the ESP32-S3**:
+   ```bash
+   # First flash via USB (hold BOOT, press RESET, release BOOT):
+   esphome run freezertrack-scanner.yaml
+
+   # Subsequent updates go over WiFi (OTA) automatically
+   ```
+
+4. **Adopt in Home Assistant** — once flashed and connected to WiFi, the device appears in HA under *Settings > Devices & Services > ESPHome*. Click "Configure" to adopt it.
+
+5. **Connect the scanner service to HA** — generate a long-lived access token in your HA profile, then update the scanner config:
+   ```bash
+   # /opt/freezertrack-scanner/config.env
+   HA_URL=http://homeassistant.local:8123
+   HA_TOKEN=your_long_lived_access_token
+   ```
+   Restart the scanner: `sudo systemctl restart freezertrack-scanner`
+
+### How It Works
+
+- The touchscreen shows two buttons: **SCAN IN** (add to freezer) and **SCAN OUT** (remove from freezer).
+- Tapping a button updates a `select` entity in Home Assistant.
+- The scanner service polls HA for the current mode before processing each barcode.
+- After each scan, the result (e.g., "Added: Chicken Breast") is pushed back to the touchscreen display via HA.
+- If HA is unreachable, the scanner falls back to the `--mode` CLI argument.
+
 ## One-Time Pi Bluetooth Setup
 
 Pair the Niimbot B1 label printer before first use:
@@ -159,4 +209,5 @@ pytest backend/ -v
 - **Backend**: Python 3.12, FastAPI, SQLAlchemy, SQLite, Alembic
 - **Frontend**: React 18, Vite, Tailwind CSS, React Router v6
 - **Printer**: Niimbot B1 via Bluetooth (niimprint library)
+- **Scanner HMI**: ESPHome, LVGL, Waveshare ESP32-S3-Touch-LCD-2.1
 - **Deploy**: Docker / Podman / Proxmox LXC, nginx, Raspberry Pi 4

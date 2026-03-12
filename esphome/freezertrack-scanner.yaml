@@ -1,0 +1,819 @@
+# FreezerTrack Scanner Controller
+# Waveshare ESP32-S3-Touch-LCD-2.1 (480x480 round, ST7701S + CST820)
+# Displays Scan In / Scan Out buttons, exposes mode to Home Assistant.
+
+substitutions:
+  api_url: "http://192.168.1.100:8080"   # <-- edit to match your FreezerTrack server
+
+esphome:
+  name: freezertrack-scanner
+  friendly_name: "FreezerTrack Scanner"
+  platformio_options:
+    board_build.flash_mode: dio
+    board_build.arduino.memory_type: qio_opi
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          // CST820 enters standby after ~2s, disabling touch interrupts.
+          // Write 0xFF to register 0xFE to disable auto-sleep permanently.
+          uint8_t val = 0xFF;
+          auto err = id(touch).write_register(0xFE, &val, 1);
+          if (err == i2c::ERROR_OK) {
+            ESP_LOGI("cst820", "Auto-sleep disabled (reg 0xFE = 0xFF)");
+          } else {
+            ESP_LOGW("cst820", "Failed to disable auto-sleep, retrying after reset");
+            // Chip may have already slept — toggle reset via PCA9554 pin 1 and retry
+            id(io_expander).digital_write(1, false);
+            delay(10);
+            id(io_expander).digital_write(1, true);
+            delay(50);
+            err = id(touch).write_register(0xFE, &val, 1);
+            ESP_LOGI("cst820", "Retry disable auto-sleep: %s",
+                     err == i2c::ERROR_OK ? "OK" : "FAILED");
+          }
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: "y"
+      CONFIG_ESP32S3_SPIRAM_SUPPORT: "y"
+      CONFIG_SPIRAM_MODE_OCT: "y"
+      CONFIG_SPIRAM_SPEED_80M: "y"
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret ha_api_key
+  services:
+    - service: set_last_scan
+      variables:
+        message: string
+      then:
+        - text_sensor.template.publish:
+            id: last_scan_result
+            state: !lambda 'return message;'
+        - script.execute:
+            id: flash_scan_result
+            result: !lambda 'return message;'
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  ap:
+    ssid: "FreezerTrack-Scanner"
+    password: "freezertrack"
+
+captive_portal:
+
+# --- HTTP client for FreezerTrack API calls ---
+http_request:
+  useragent: "ESPHome/FreezerTrack"
+  timeout: 10s
+
+globals:
+  - id: update_running
+    type: bool
+    restore_value: false
+    initial_value: "false"
+  - id: syncing_from_api
+    type: bool
+    restore_value: false
+    initial_value: "false"
+
+# --- I2C bus (shared: touch, I/O expander, RTC, IMU) ---
+i2c:
+  sda: GPIO15
+  scl: GPIO7
+  scan: true
+
+# --- TCA9554 I/O expander at 0x20 ---
+# EXIO1(0)=LCD_RST  EXIO2(1)=TP_RST  EXIO3(2)=LCD_CS  EXIO4(3)=SD_CS
+# EXIO5(4)=IMU_INT2 EXIO6(5)=IMU_INT1 EXIO7(6)=RTC_INT EXIO8(7)=Buzzer
+pca9554:
+  id: io_expander
+  address: 0x20
+  pin_count: 8
+
+# --- SPI bus for ST7701S init commands ---
+spi:
+  clk_pin: GPIO2
+  mosi_pin: GPIO1
+
+# --- Backlight (GPIO6, PWM) ---
+output:
+  - platform: ledc
+    pin: GPIO6
+    id: backlight_output
+
+light:
+  - platform: monochromatic
+    output: backlight_output
+    name: "Display Backlight"
+    id: backlight
+    default_transition_length: 250ms
+    restore_mode: ALWAYS_ON
+
+# --- Display: ST7701S 480x480 RGB ---
+display:
+  - platform: st7701s
+    id: lcd
+    dimensions:
+      width: 480
+      height: 480
+    update_interval: never
+    auto_clear_enabled: false
+    color_order: RGB
+    invert_colors: false
+    pclk_frequency: 16MHz
+    pclk_inverted: false
+    data_rate: 40MHz
+    spi_mode: MODE0
+    cs_pin:
+      pca9554: io_expander
+      number: 2
+      mode: OUTPUT
+    reset_pin:
+      pca9554: io_expander
+      number: 0
+      mode: OUTPUT
+    de_pin: GPIO40
+    hsync_pin: GPIO38
+    vsync_pin: GPIO39
+    pclk_pin: GPIO41
+    hsync_pulse_width: 8
+    hsync_back_porch: 10
+    hsync_front_porch: 50
+    vsync_pulse_width: 3
+    vsync_back_porch: 8
+    vsync_front_porch: 8
+    data_pins:
+      blue:
+        - 5         # B1
+        - 45        # B2
+        - 48        # B3
+        - 47        # B4
+        - 21        # B5
+      green:
+        - 14        # G0
+        - 13        # G1
+        - 12        # G2
+        - 11        # G3
+        - 10        # G4
+        - 9         # G5
+      red:
+        - 46        # R1
+        - 3         # R2
+        - 8         # R3
+        - 18        # R4
+        - 17        # R5
+    init_sequence:
+      # Page 1 - timing / gamma
+      - [0xFF, 0x77, 0x01, 0x00, 0x00, 0x10]
+      - [0xC0, 0x3B, 0x00]
+      - [0xC1, 0x0B, 0x02]
+      - [0xC2, 0x07, 0x02]
+      - [0xCC, 0x10]
+      - [0xCD, 0x08]
+      - [0xB0, 0x00, 0x11, 0x16, 0x0E, 0x11, 0x06, 0x05, 0x09, 0x08, 0x21, 0x06, 0x13, 0x10, 0x29, 0x31, 0x18]
+      - [0xB1, 0x00, 0x11, 0x16, 0x0E, 0x11, 0x07, 0x05, 0x09, 0x09, 0x21, 0x05, 0x13, 0x11, 0x2A, 0x31, 0x18]
+      # Page 2 - power / voltage
+      - [0xFF, 0x77, 0x01, 0x00, 0x00, 0x11]
+      - [0xB0, 0x6D]
+      - [0xB1, 0x37]
+      - [0xB2, 0x81]
+      - [0xB3, 0x80]
+      - [0xB5, 0x43]
+      - [0xB7, 0x85]
+      - [0xB8, 0x20]
+      - [0xC1, 0x78]
+      - [0xC2, 0x78]
+      - [0xD0, 0x88]
+      - [0xE0, 0x00, 0x00, 0x02]
+      - [0xE1, 0x03, 0xA0, 0x00, 0x00, 0x04, 0xA0, 0x00, 0x00, 0x00, 0x20, 0x20]
+      - [0xE2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+      - [0xE3, 0x00, 0x00, 0x11, 0x00]
+      - [0xE4, 0x22, 0x00]
+      - [0xE5, 0x05, 0xEC, 0xA0, 0xA0, 0x07, 0xEE, 0xA0, 0xA0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+      - [0xE6, 0x00, 0x00, 0x11, 0x00]
+      - [0xE7, 0x22, 0x00]
+      - [0xE8, 0x06, 0xED, 0xA0, 0xA0, 0x08, 0xEF, 0xA0, 0xA0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+      - [0xEB, 0x00, 0x00, 0x40, 0x40, 0x00, 0x00, 0x00]
+      - [0xED, 0xFF, 0xFF, 0xFF, 0xBA, 0x0A, 0xBF, 0x45, 0xFF, 0xFF, 0x54, 0xFB, 0xA0, 0xAB, 0xFF, 0xFF, 0xFF]
+      - [0xEF, 0x10, 0x0D, 0x04, 0x08, 0x3F, 0x1F]
+      # Page 3
+      - [0xFF, 0x77, 0x01, 0x00, 0x00, 0x13]
+      - [0xEF, 0x08]
+      # Page 0 - display on
+      - [0xFF, 0x77, 0x01, 0x00, 0x00, 0x00]
+      - [0x36, 0x00]
+      - [0x3A, 0x66]
+      - [0x11]
+      - delay 120ms
+      - [0x20]
+      - delay 120ms
+      - [0x29]
+
+# --- Touchscreen: CST820 (CST816-compatible) ---
+# CST820 enters standby after ~2s of no touch, ignoring I2C until
+# the next touch event. skip_probe prevents init failure on boot.
+touchscreen:
+  - platform: cst816
+    id: touch
+    address: 0x15
+    interrupt_pin:
+      number: GPIO16
+      mode: INPUT_PULLUP
+    reset_pin:
+      pca9554: io_expander
+      number: 1
+      mode: OUTPUT
+    skip_probe: true
+    on_touch:
+      - if:
+          condition: lvgl.is_paused
+          then:
+            - logger.log: "Touch detected while asleep, waking display"
+            - lvgl.resume:
+            - lvgl.page.show: main_page
+
+# --- Fonts ---
+font:
+  - file: "gfonts://Roboto@500"
+    id: font_button
+    size: 32
+    bpp: 4
+  - file: "gfonts://Roboto"
+    id: font_status
+    size: 18
+    bpp: 4
+  - file: "gfonts://Roboto@500"
+    id: font_title
+    size: 22
+    bpp: 4
+
+# --- Scan mode select (exposed to HA) ---
+select:
+  - platform: template
+    id: scan_mode
+    name: "Scan Mode"
+    options:
+      - "scan_in"
+      - "scan_out"
+    initial_option: "scan_out"
+    optimistic: true
+    on_value:
+      then:
+        - logger.log:
+            format: "Scan mode changed to: %s"
+            args: ['x.c_str()']
+        - lambda: |-
+            if (x == "scan_in") {
+              lv_obj_add_state(id(btn_scan_in), LV_STATE_CHECKED);
+              lv_obj_clear_state(id(btn_scan_out), LV_STATE_CHECKED);
+            } else {
+              lv_obj_clear_state(id(btn_scan_in), LV_STATE_CHECKED);
+              lv_obj_add_state(id(btn_scan_out), LV_STATE_CHECKED);
+            }
+        - lvgl.label.update:
+            id: lbl_mode_indicator
+            text: !lambda |-
+              if (x == "scan_in") return "SCAN IN";
+              return "SCAN OUT";
+        - if:
+            condition:
+              lambda: 'return !id(syncing_from_api);'
+            then:
+              - http_request.put:
+                  url: "${api_url}/api/scanner/mode"
+                  json:
+                    mode: !lambda |-
+                      return (x == "scan_in") ? "in" : "out";
+                  on_response:
+                    then:
+                      - logger.log:
+                          format: "API mode sync: HTTP %d"
+                          args: ['response->status_code']
+
+# --- Text sensors ---
+text_sensor:
+  - platform: template
+    id: last_scan_result
+    name: "Last Scan"
+
+  - platform: wifi_info
+    ip_address:
+      id: wifi_ip
+    ssid:
+      id: wifi_ssid_info
+
+# --- Poll FreezerTrack API for mode changes (from web UI or other clients) ---
+interval:
+  - interval: 5s
+    then:
+      - http_request.get:
+          url: "${api_url}/api/scanner/mode"
+          capture_response: true
+          on_response:
+            then:
+              - lambda: |-
+                  if (response->status_code != 200) return;
+                  json::parse_json(body, [](JsonObject root) -> bool {
+                    std::string api_mode = root["mode"] | "";
+                    std::string select_val = (api_mode == "in") ? "scan_in" : "scan_out";
+                    auto current = id(scan_mode).state;
+                    if (current != select_val) {
+                      id(syncing_from_api) = true;
+                      auto call = id(scan_mode).make_call();
+                      call.set_option(select_val);
+                      call.perform();
+                      id(syncing_from_api) = false;
+                      ESP_LOGI("mode_sync", "Mode updated from API: %s", api_mode.c_str());
+                    }
+                    return true;
+                  });
+
+# --- WiFi signal sensor ---
+sensor:
+  - platform: wifi_signal
+    name: "WiFi Signal"
+    id: wifi_signal_sensor
+    update_interval: 30s
+
+# --- Script for flashing scan result on screen ---
+script:
+  - id: flash_scan_result
+    parameters:
+      result: string
+    then:
+      - lvgl.label.update:
+          id: lbl_last_scan
+          text: !lambda 'return result;'
+      - if:
+          condition:
+            lambda: 'return result.find("FAIL") != std::string::npos;'
+          then:
+            - lvgl.widget.update:
+                id: status_bar
+                bg_color: 0xE74C3C
+          else:
+            - lvgl.widget.update:
+                id: status_bar
+                bg_color: 0x27AE60
+      - delay: 3s
+      - lvgl.widget.update:
+          id: status_bar
+          bg_color: 0x1B2A4A
+
+  - id: trigger_ft_update
+    then:
+      - if:
+          condition:
+            lambda: 'return id(update_running);'
+          then:
+            - lvgl.label.update:
+                id: lbl_update_status
+                text: "Update already running..."
+          else:
+            - globals.set:
+                id: update_running
+                value: "true"
+            - lvgl.label.update:
+                id: lbl_update_status
+                text: "Starting update..."
+                text_color: 0xF39C12
+            - lvgl.widget.update:
+                id: btn_update
+                state:
+                  disabled: true
+            - http_request.post:
+                url: "${api_url}/api/admin/update"
+                capture_response: true
+                on_response:
+                  then:
+                    - if:
+                        condition:
+                          lambda: 'return response->status_code == 200;'
+                        then:
+                          - lvgl.label.update:
+                              id: lbl_update_status
+                              text: "Updating... please wait"
+                              text_color: 0xF39C12
+                          - script.execute: poll_ft_update
+                        else:
+                          - lvgl.label.update:
+                              id: lbl_update_status
+                              text: !lambda |-
+                                if (response->status_code == 409) return "Update already in progress";
+                                return "Failed to start update";
+                              text_color: 0xE74C3C
+                          - globals.set:
+                              id: update_running
+                              value: "false"
+                          - lvgl.widget.update:
+                              id: btn_update
+                              state:
+                                disabled: false
+
+  - id: poll_ft_update
+    then:
+      - while:
+          condition:
+            lambda: 'return id(update_running);'
+          then:
+            - delay: 4s
+            - http_request.get:
+                url: "${api_url}/api/admin/update/status"
+                capture_response: true
+                on_response:
+                  then:
+                    - lambda: |-
+                        if (response->status_code != 200) return;
+                        json::parse_json(body, [](JsonObject root) -> bool {
+                          bool running = root["running"] | false;
+                          int exit_code = root["exit_code"] | -1;
+                          if (!running) {
+                            id(update_running) = false;
+                            if (exit_code == 0) {
+                              lv_label_set_text(id(lbl_update_status), "Update complete!");
+                              lv_obj_set_style_text_color(id(lbl_update_status), lv_color_hex(0x27AE60), 0);
+                            } else {
+                              lv_label_set_text(id(lbl_update_status), "Update failed");
+                              lv_obj_set_style_text_color(id(lbl_update_status), lv_color_hex(0xE74C3C), 0);
+                            }
+                            lv_obj_clear_state(id(btn_update), LV_STATE_DISABLED);
+                          }
+                          return true;
+                        });
+
+  - id: trigger_ft_restart
+    then:
+      - lvgl.label.update:
+          id: lbl_update_status
+          text: "Restarting service..."
+          text_color: 0xF39C12
+      - lvgl.widget.update:
+          id: btn_restart
+          state:
+            disabled: true
+      - http_request.post:
+          url: "${api_url}/api/admin/restart"
+          capture_response: true
+          on_response:
+            then:
+              - if:
+                  condition:
+                    lambda: 'return response->status_code == 200;'
+                  then:
+                    - lvgl.label.update:
+                        id: lbl_update_status
+                        text: "Service restarted"
+                        text_color: 0x27AE60
+                  else:
+                    - lvgl.label.update:
+                        id: lbl_update_status
+                        text: "Restart failed"
+                        text_color: 0xE74C3C
+              - delay: 3s
+              - lvgl.widget.update:
+                  id: btn_restart
+                  state:
+                    disabled: false
+
+# --- LVGL UI ---
+lvgl:
+  displays:
+    - lcd
+  touchscreens:
+    - touch
+  buffer_size: 25%
+  color_depth: 16
+
+  on_idle:
+    - timeout: 300s
+      then:
+        - logger.log: "Display idle for 5 min, turning off backlight"
+        - light.turn_off:
+            id: backlight
+            transition_length: 1s
+        - lvgl.pause:
+
+  on_pause:
+    - logger.log: "LVGL paused (screen off)"
+
+  on_resume:
+    - logger.log: "LVGL resumed (screen on)"
+    - light.turn_on:
+        id: backlight
+        brightness: 100%
+        transition_length: 500ms
+  style_definitions:
+    - id: style_btn_base
+      radius: 24
+      border_width: 3
+      border_color: 0x5DADE2
+      bg_color: 0x1B2A4A
+      text_color: 0xCCCCCC
+      pad_all: 12
+    - id: style_btn_checked
+      bg_color: 0x5DADE2
+      text_color: 0xFFFFFF
+      border_color: 0x85C1E9
+
+  theme:
+    button:
+      border_width: 3
+      border_color: 0x5DADE2
+
+  # Round display safe widths (480px diameter):
+  #   y=80/400 → ~358px    y=100/380 → ~390px
+  #   y=120/360 → ~416px   y=160/320 → ~450px
+  #   y=240 (center) → 480px
+
+  pages:
+    # ==============================================================
+    # Scanner page
+    # ==============================================================
+    - id: main_page
+      bg_color: 0x0D1B2A
+      widgets:
+        # --- Mode indicator + gear (top, inside circle) ---
+        - obj:
+            id: status_bar
+            width: 240
+            height: 36
+            align: TOP_MID
+            y: 72
+            bg_color: 0x1B2A4A
+            bg_opa: COVER
+            radius: 18
+            pad_left: 14
+            pad_right: 6
+            layout:
+              type: FLEX
+              flex_flow: ROW
+              flex_align_main: SPACE_BETWEEN
+              flex_align_cross: CENTER
+            widgets:
+              - label:
+                  id: lbl_mode_indicator
+                  text_font: font_status
+                  text_color: 0x5DADE2
+                  text: "SCAN OUT"
+              - button:
+                  id: btn_settings
+                  width: 30
+                  height: 30
+                  radius: 15
+                  bg_color: 0x1B2A4A
+                  border_width: 0
+                  pad_all: 0
+                  widgets:
+                    - label:
+                        align: CENTER
+                        text_font: font_status
+                        text_color: 0x7F8C8D
+                        text: "\uF013"
+                  on_click:
+                    - logger.log: "Button: Settings gear pressed"
+                    - lvgl.page.show:
+                        id: admin_page
+                        animation: MOVE_LEFT
+                        time: 300ms
+
+        # --- Scan In button ---
+        - button:
+            id: btn_scan_in
+            width: 280
+            height: 100
+            align: CENTER
+            y: -48
+            checkable: true
+            styles: style_btn_base
+            checked:
+              styles: style_btn_checked
+              bg_color: 0x27AE60
+              border_color: 0x2ECC71
+            widgets:
+              - obj:
+                  width: SIZE_CONTENT
+                  height: SIZE_CONTENT
+                  align: CENTER
+                  bg_opa: TRANSP
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_main: CENTER
+                    flex_align_cross: CENTER
+                  widgets:
+                    - label:
+                        text_font: font_button
+                        text: "SCAN IN"
+                        text_color: 0xFFFFFF
+                    - label:
+                        text_font: font_status
+                        text: "Add to freezer"
+                        text_color: 0x85C1E9
+            on_click:
+              - logger.log: "Button: SCAN IN pressed"
+              - select.set:
+                  id: scan_mode
+                  option: "scan_in"
+
+        # --- Scan Out button ---
+        - button:
+            id: btn_scan_out
+            width: 280
+            height: 100
+            align: CENTER
+            y: 62
+            checkable: true
+            state:
+              checked: true
+            styles: style_btn_base
+            checked:
+              styles: style_btn_checked
+              bg_color: 0x2980B9
+              border_color: 0x3498DB
+            widgets:
+              - obj:
+                  width: SIZE_CONTENT
+                  height: SIZE_CONTENT
+                  align: CENTER
+                  bg_opa: TRANSP
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_main: CENTER
+                    flex_align_cross: CENTER
+                  widgets:
+                    - label:
+                        text_font: font_button
+                        text: "SCAN OUT"
+                        text_color: 0xFFFFFF
+                    - label:
+                        text_font: font_status
+                        text: "Remove from freezer"
+                        text_color: 0x85C1E9
+            on_click:
+              - logger.log: "Button: SCAN OUT pressed"
+              - select.set:
+                  id: scan_mode
+                  option: "scan_out"
+
+        # --- Last scan result (bottom, narrowed for circle) ---
+        - label:
+            text_font: font_status
+            text_color: 0x7F8C8D
+            align: CENTER
+            y: 148
+            text: "Last scan:"
+        - label:
+            id: lbl_last_scan
+            text_font: font_status
+            text_color: 0xBDC3C7
+            align: CENTER
+            y: 168
+            text: "Waiting..."
+            long_mode: DOT
+            width: 240
+
+    # ==============================================================
+    # Admin / Settings page
+    # ==============================================================
+    - id: admin_page
+      bg_color: 0x0D1B2A
+      widgets:
+        # --- Header with back arrow (top, inside circle) ---
+        - obj:
+            width: 200
+            height: 36
+            align: TOP_MID
+            y: 72
+            bg_color: 0x1B2A4A
+            bg_opa: COVER
+            radius: 18
+            pad_left: 4
+            pad_right: 14
+            layout:
+              type: FLEX
+              flex_flow: ROW
+              flex_align_main: START
+              flex_align_cross: CENTER
+            widgets:
+              - button:
+                  width: 30
+                  height: 30
+                  radius: 15
+                  bg_color: 0x1B2A4A
+                  border_width: 0
+                  pad_all: 0
+                  widgets:
+                    - label:
+                        align: CENTER
+                        text_font: font_status
+                        text_color: 0x5DADE2
+                        text: "\uF053"
+                  on_click:
+                    - logger.log: "Button: Back arrow pressed"
+                    - lvgl.page.show:
+                        id: main_page
+                        animation: MOVE_RIGHT
+                        time: 300ms
+              - label:
+                  text_font: font_title
+                  text_color: 0x5DADE2
+                  text: "Settings"
+
+        # --- Update button ---
+        - button:
+            id: btn_update
+            width: 280
+            height: 90
+            align: CENTER
+            y: -42
+            styles: style_btn_base
+            bg_color: 0x1B2A4A
+            border_color: 0xF39C12
+            widgets:
+              - obj:
+                  width: SIZE_CONTENT
+                  height: SIZE_CONTENT
+                  align: CENTER
+                  bg_opa: TRANSP
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_main: CENTER
+                    flex_align_cross: CENTER
+                  widgets:
+                    - label:
+                        text_font: font_button
+                        text: "UPDATE"
+                        text_color: 0xF39C12
+                    - label:
+                        text_font: font_status
+                        text: "Pull latest & rebuild"
+                        text_color: 0x85C1E9
+            on_click:
+              - logger.log: "Button: UPDATE pressed"
+              - script.execute: trigger_ft_update
+
+        # --- Restart button ---
+        - button:
+            id: btn_restart
+            width: 280
+            height: 72
+            align: CENTER
+            y: 55
+            styles: style_btn_base
+            bg_color: 0x1B2A4A
+            border_color: 0xE74C3C
+            widgets:
+              - obj:
+                  width: SIZE_CONTENT
+                  height: SIZE_CONTENT
+                  align: CENTER
+                  bg_opa: TRANSP
+                  layout:
+                    type: FLEX
+                    flex_flow: COLUMN
+                    flex_align_main: CENTER
+                    flex_align_cross: CENTER
+                  widgets:
+                    - label:
+                        text_font: font_button
+                        text: "RESTART"
+                        text_color: 0xE74C3C
+                    - label:
+                        text_font: font_status
+                        text: "Restart service"
+                        text_color: 0x85C1E9
+            on_click:
+              - logger.log: "Button: RESTART pressed"
+              - script.execute: trigger_ft_restart
+
+        # --- Status text (bottom, narrowed for circle) ---
+        - label:
+            id: lbl_update_status
+            text_font: font_status
+            text_color: 0x7F8C8D
+            align: CENTER
+            y: 155
+            text: "Ready"
+            long_mode: DOT
+            width: 240

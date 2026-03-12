@@ -1,24 +1,32 @@
 import { useState, useEffect } from "react";
-import { getItems, getHAState } from "../api/client";
+import { getItems, getHAState, getScannerMode, setScannerMode } from "../api/client";
 import FoodCard from "../components/FoodCard";
 import AlertBanner from "../components/AlertBanner";
 import { useNavigate } from "react-router-dom";
+import { LogIn, LogOut } from "lucide-react";
 
 export default function Dashboard() {
   const [items, setItems] = useState([]);
   const [haState, setHAState] = useState(null);
+  const [scanMode, setScanMode] = useState(null);
   const navigate = useNavigate();
 
   const fetchData = () => {
     getItems().then(setItems).catch(() => {});
     getHAState().then(setHAState).catch(() => {});
+    getScannerMode().then((s) => setScanMode(s.mode)).catch(() => {});
   };
 
   useEffect(() => {
     fetchData();
-    const id = setInterval(fetchData, 60000);
+    const id = setInterval(fetchData, 5000);
     return () => clearInterval(id);
   }, []);
+
+  const toggleScanMode = (m) => {
+    setScanMode(m);
+    setScannerMode(m).catch(() => {});
+  };
 
   const totalItems = items.length;
   const addedThisWeek = items.filter((i) => {
@@ -53,6 +61,36 @@ export default function Dashboard() {
           color="text-amber-600"
         />
       </div>
+
+      {scanMode !== null && (
+        <div className="bg-white rounded-xl border border-gray-200 p-3 sm:p-4 mb-4 sm:mb-6">
+          <p className="text-xs text-gray-500 mb-2 font-medium">USB Scanner Mode</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => toggleScanMode("in")}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors active:scale-[0.98] ${
+                scanMode === "in"
+                  ? "bg-green-600 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              <LogIn size={16} />
+              Scan In
+            </button>
+            <button
+              onClick={() => toggleScanMode("out")}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-colors active:scale-[0.98] ${
+                scanMode === "out"
+                  ? "bg-[var(--ice-blue)] text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              <LogOut size={16} />
+              Scan Out
+            </button>
+          </div>
+        </div>
+      )}
 
       {haState?.alerts?.length > 0 && (
         <div className="mb-4 sm:mb-6">

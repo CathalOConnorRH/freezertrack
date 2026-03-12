@@ -3,16 +3,23 @@
 FreezerTrack Barcode Scanner Service
 
 Reads barcodes from a USB HID scanner (e.g. NetumScan) and sends them
-to the FreezerTrack API for scan-out. Grabs exclusive access to the
-input device so keystrokes don't leak into the terminal.
+to the FreezerTrack API for scan-in or scan-out. Grabs exclusive access
+to the input device so keystrokes don't leak into the terminal.
+
+The scan mode can be controlled from a Waveshare ESP32-S3-Touch-LCD-2.1
+touchscreen running ESPHome, via Home Assistant.
 
 Usage:
   sudo python3 scanner.py --api http://192.168.1.100 --device /dev/input/event0
+  sudo python3 scanner.py --api http://192.168.1.100 \\
+      --ha-url http://homeassistant.local:8123 --ha-token TOKEN
 
 Environment variables (alternative to CLI args):
   FREEZERTRACK_API_URL    e.g. http://192.168.1.100
   SCANNER_DEVICE          e.g. /dev/input/event0  (auto-detect if not set)
-  SCANNER_MODE            "out" (default) or "in"
+  SCANNER_MODE            "out" (default) or "in"  (fallback when HA unavailable)
+  HA_URL                  e.g. http://homeassistant.local:8123
+  HA_TOKEN                Long-lived access token from HA user profile
 """
 
 import argparse
@@ -21,7 +28,7 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import evdev
 import httpx
@@ -199,7 +206,8 @@ def read_barcodes(device_path: str):
         dev.ungrab()
 
 
-def handle_scan_out(barcode: str, api_url: str, client: httpx.Client) -> bool:
+def handle_scan_out(barcode: str, api_url: str, client: httpx.Client) -> tuple[bool, str]:
+    """Process a barcode for scan-out (remove from freezer). Returns (success, item_name)."""
     base = api_url.rstrip("/")
 
     try:
@@ -209,10 +217,10 @@ def handle_scan_out(barcode: str, api_url: str, client: httpx.Client) -> bool:
             if resp.status_code == 200:
                 name = data.get("name", "Item")
                 log.info(f"REMOVED: {name} (QR code ID: {data['id'][:8]})")
-                return True
+                return True, name
             else:
                 log.warning(f"Remove failed ({resp.status_code}): {resp.text}")
-                return False
+                return False, ""
     except (json.JSONDecodeError, TypeError):
         pass
 
@@ -227,20 +235,120 @@ def handle_scan_out(barcode: str, api_url: str, client: httpx.Client) -> bool:
 
         if not items:
             log.warning(f"NOT FOUND in freezer: {search_name}")
-            return False
+            return False, search_name
 
         oldest = min(items, key=lambda i: i["frozen_date"])
         resp = client.post(f"{base}/api/food/{oldest['id']}/remove")
         if resp.status_code == 200:
             log.info(f"REMOVED: {oldest['name']} (oldest, frozen {oldest['frozen_date']})")
-            return True
+            return True, oldest["name"]
         else:
             log.warning(f"Remove failed ({resp.status_code}): {resp.text}")
-            return False
+            return False, oldest["name"]
 
     except Exception as e:
         log.error(f"Scan-out error: {e}")
-        return False
+        return False, ""
+
+
+def handle_scan_in(barcode: str, api_url: str, client: httpx.Client) -> tuple[bool, str]:
+    """Process a barcode for scan-in (add to freezer). Returns (success, item_name)."""
+    base = api_url.rstrip("/")
+
+    try:
+        data = json.loads(barcode)
+        if "id" in data:
+            log.info(f"QR code scan-in: re-adding item by ID {data['id'][:8]}")
+            resp = client.post(f"{base}/api/food/{data['id']}/readd")
+            if resp.status_code == 200:
+                name = data.get("name", resp.json().get("name", "Item"))
+                log.info(f"RE-ADDED: {name}")
+                return True, name
+            else:
+                log.warning(f"Re-add failed ({resp.status_code}): {resp.text}")
+                return False, ""
+    except (json.JSONDecodeError, TypeError):
+        pass
+
+    log.info(f"Looking up barcode for scan-in: {barcode}")
+    try:
+        lookup = client.get(f"{base}/api/food/lookup/{barcode}")
+        lookup_data = lookup.json()
+
+        if not lookup_data.get("found"):
+            log.warning(f"Barcode not found in any database: {barcode}")
+            return False, ""
+
+        name = lookup_data.get("name", "Unknown")
+        brand = lookup_data.get("brand")
+
+        payload = {
+            "name": name,
+            "brand": brand,
+            "category": None,
+            "frozen_date": str(date.today()),
+            "quantity": 1,
+            "containers": 1,
+            "auto_print": True,
+        }
+        resp = client.post(f"{base}/api/food", json=payload)
+        if resp.status_code == 201:
+            count = resp.json().get("count", 1)
+            log.info(f"ADDED: {name} (x{count})")
+            return True, name
+        else:
+            log.warning(f"Add failed ({resp.status_code}): {resp.text}")
+            return False, name
+
+    except Exception as e:
+        log.error(f"Scan-in error: {e}")
+        return False, ""
+
+
+def get_mode_from_api(api_url: str, client: httpx.Client, fallback: str) -> str:
+    """Read the current scan mode from the FreezerTrack API (primary source)."""
+    try:
+        resp = client.get(f"{api_url.rstrip('/')}/api/scanner/mode", timeout=3)
+        if resp.status_code == 200:
+            mode = resp.json().get("mode", "")
+            if mode in ("in", "out"):
+                return mode
+    except Exception as e:
+        log.debug(f"API mode poll failed: {e}")
+    return fallback
+
+
+def get_mode_from_ha(ha_url: str, ha_token: str, ha_client: httpx.Client,
+                     fallback: str) -> str:
+    """Read the current scan mode from the ESPHome select entity via HA REST API (fallback)."""
+    try:
+        resp = ha_client.get(
+            f"{ha_url}/api/states/select.freezertrack_scanner_scan_mode",
+            headers={"Authorization": f"Bearer {ha_token}"},
+            timeout=3,
+        )
+        if resp.status_code == 200:
+            state = resp.json().get("state", "")
+            if state in ("scan_in", "scan_out"):
+                return "in" if state == "scan_in" else "out"
+    except Exception as e:
+        log.debug(f"HA mode poll failed: {e}")
+    return fallback
+
+
+def report_scan_to_ha(ha_url: str, ha_token: str, ha_client: httpx.Client,
+                      message: str):
+    """Push scan result to the ESPHome device via HA service call."""
+    try:
+        ha_client.post(
+            f"{ha_url}/api/services/esphome/freezertrack_scanner_set_last_scan",
+            headers={"Authorization": f"Bearer {ha_token}",
+                     "Content-Type": "application/json"},
+            json={"message": message},
+            timeout=3,
+        )
+    except Exception as e:
+        log.debug(f"HA report failed: {e}")
 
 
 def main():
@@ -251,6 +359,10 @@ def main():
                         help="Input device path (e.g. /dev/input/event0). Auto-detects if not set.")
     parser.add_argument("--mode", default=os.environ.get("SCANNER_MODE", "out"),
                         choices=["out", "in"], help="Scan mode: out (remove) or in (add)")
+    parser.add_argument("--ha-url", default=os.environ.get("HA_URL", ""),
+                        help="Home Assistant URL (e.g. http://homeassistant.local:8123)")
+    parser.add_argument("--ha-token", default=os.environ.get("HA_TOKEN", ""),
+                        help="Home Assistant long-lived access token")
     parser.add_argument("--list-devices", action="store_true", help="List input devices and exit")
     args = parser.parse_args()
 
@@ -272,15 +384,22 @@ def main():
     _state["mode"] = args.mode
     _state["uptime_since"] = datetime.now(timezone.utc).isoformat()
 
+    ha_enabled = bool(args.ha_url and args.ha_token)
+
     client = httpx.Client(timeout=10)
+    ha_client = httpx.Client() if ha_enabled else None
     _state["api_connected"] = check_api(args.api, client)
     save_state()
 
-    log.info(f"FreezerTrack Scanner Service")
+    log.info("FreezerTrack Scanner Service")
     log.info(f"  API:    {args.api} ({'connected' if _state['api_connected'] else 'UNREACHABLE'})")
     log.info(f"  Device: {device_path}")
-    log.info(f"  Mode:   scan-{args.mode}")
-    log.info(f"Waiting for scans...")
+    log.info(f"  Mode:   scan-{args.mode} (fallback)")
+    if ha_enabled:
+        log.info(f"  HA:     {args.ha_url} (mode from touchscreen)")
+    else:
+        log.info("  HA:     not configured (using fixed --mode)")
+    log.info("Waiting for scans...")
 
     try:
         for barcode in read_barcodes(device_path):
@@ -288,13 +407,24 @@ def main():
 
             _state["api_connected"] = check_api(args.api, client)
 
-            if args.mode == "out":
-                success = handle_scan_out(barcode, args.api, client)
+            mode = get_mode_from_api(args.api, client, args.mode)
+            if mode == args.mode and ha_enabled:
+                mode = get_mode_from_ha(
+                    args.ha_url, args.ha_token, ha_client, mode)
+            _state["mode"] = mode
+            log.info(f"  Mode: scan-{mode}")
+
+            if mode == "out":
+                success, item_name = handle_scan_out(barcode, args.api, client)
+                ha_message = f"Removed: {item_name}" if success else f"FAIL: {item_name or barcode[:20]}"
             else:
-                log.info(f"Scan-in mode not yet implemented. Barcode: {barcode}")
-                success = False
+                success, item_name = handle_scan_in(barcode, args.api, client)
+                ha_message = f"Added: {item_name}" if success else f"FAIL: {item_name or barcode[:20]}"
 
             record_scan(barcode, success)
+
+            if ha_enabled:
+                report_scan_to_ha(args.ha_url, args.ha_token, ha_client, ha_message)
 
             if success:
                 log.info(">>> OK")
@@ -310,6 +440,8 @@ def main():
         _state["usb_connected"] = False
         save_state()
         client.close()
+        if ha_client:
+            ha_client.close()
 
 
 if __name__ == "__main__":
