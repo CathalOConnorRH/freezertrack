@@ -29,8 +29,9 @@ mkdir -p "${INSTALL_DIR}"
 
 info "Downloading scanner..."
 curl -fsSL "${REPO_URL}/scanner.py" -o "${INSTALL_DIR}/scanner.py"
+curl -fsSL "${REPO_URL}/dashboard.py" -o "${INSTALL_DIR}/dashboard.py"
 curl -fsSL "${REPO_URL}/requirements.txt" -o "${INSTALL_DIR}/requirements.txt"
-chmod +x "${INSTALL_DIR}/scanner.py"
+chmod +x "${INSTALL_DIR}/scanner.py" "${INSTALL_DIR}/dashboard.py"
 ok "Scanner downloaded"
 
 # ── Python venv ──────────────────────────────────────────────────────────────
@@ -81,16 +82,36 @@ RestartSec=5
 User=root
 WorkingDirectory=${INSTALL_DIR}
 EnvironmentFile=${INSTALL_DIR}/config.env
+Environment=SCANNER_STATE_FILE=${INSTALL_DIR}/state.json
 ExecStart=${INSTALL_DIR}/venv/bin/python3 ${INSTALL_DIR}/scanner.py
 
 [Install]
 WantedBy=multi-user.target
 SERVICE
 
+cat <<SERVICE >/etc/systemd/system/freezertrack-scanner-dashboard.service
+[Unit]
+Description=FreezerTrack Scanner Dashboard
+After=network.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=5
+User=root
+WorkingDirectory=${INSTALL_DIR}
+Environment=SCANNER_STATE_FILE=${INSTALL_DIR}/state.json
+Environment=SCANNER_DASHBOARD_PORT=8888
+ExecStart=${INSTALL_DIR}/venv/bin/python3 ${INSTALL_DIR}/dashboard.py
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
 systemctl daemon-reload
-systemctl enable freezertrack-scanner
-systemctl restart freezertrack-scanner
-ok "Service created and started"
+systemctl enable freezertrack-scanner freezertrack-scanner-dashboard
+systemctl restart freezertrack-scanner freezertrack-scanner-dashboard
+ok "Services created and started"
 
 # ── Done ─────────────────────────────────────────────────────────────────────
 
@@ -99,8 +120,11 @@ echo -e "\e[1;32m═════════════════════
 echo -e "\e[1;32m  FreezerTrack Scanner installed!\e[0m"
 echo -e "\e[1;32m════════════════════════════════════════════════════\e[0m"
 echo ""
+LOCAL_IP="$(hostname -I 2>/dev/null | awk '{print $1}' || echo 'localhost')"
+echo -e "  Dashboard: \e[1;36mhttp://${LOCAL_IP}:8888\e[0m"
 echo -e "  Config:    ${CONFIG}"
-echo -e "  Service:   systemctl status freezertrack-scanner"
+echo -e "  Scanner:   systemctl status freezertrack-scanner"
+echo -e "  Dashboard: systemctl status freezertrack-scanner-dashboard"
 echo -e "  Logs:      journalctl -u freezertrack-scanner -f"
 echo ""
 echo -e "  To change settings:"

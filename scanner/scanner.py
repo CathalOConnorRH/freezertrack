@@ -21,6 +21,7 @@ import logging
 import os
 import sys
 import time
+from datetime import datetime, timezone
 
 import evdev
 import httpx
@@ -31,6 +32,28 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 log = logging.getLogger("scanner")
+
+STATE_FILE = os.environ.get(
+    "SCANNER_STATE_FILE", "/opt/freezertrack-scanner/state.json"
+)
+MAX_HISTORY = 50
+
+_state = {
+    "api_connected": False,
+    "usb_connected": False,
+    "scanner_device": None,
+    "scanner_device_name": None,
+    "api_url": None,
+    "mode": "out",
+    "last_scan": None,
+    "last_scan_time": None,
+    "last_scan_result": None,
+    "total_scans": 0,
+    "successful_scans": 0,
+    "failed_scans": 0,
+    "uptime_since": None,
+    "scan_history": [],
+}
 
 KEYMAP = {
     evdev.ecodes.KEY_0: ("0", ")"), evdev.ecodes.KEY_1: ("1", "!"),
@@ -66,10 +89,42 @@ KEYMAP = {
 }
 
 
+def save_state():
+    try:
+        with open(STATE_FILE, "w") as f:
+            json.dump(_state, f)
+    except Exception:
+        pass
+
+
+def record_scan(barcode: str, success: bool):
+    now = datetime.now(timezone.utc).isoformat()
+    _state["last_scan"] = barcode
+    _state["last_scan_time"] = now
+    _state["last_scan_result"] = "ok" if success else "fail"
+    _state["total_scans"] += 1
+    if success:
+        _state["successful_scans"] += 1
+    else:
+        _state["failed_scans"] += 1
+    _state["scan_history"].insert(0, {
+        "barcode": barcode,
+        "success": success,
+        "time": now,
+    })
+    _state["scan_history"] = _state["scan_history"][:MAX_HISTORY]
+    save_state()
+
+
+def check_api(api_url: str, client: httpx.Client) -> bool:
+    try:
+        r = client.get(f"{api_url.rstrip('/')}/health", timeout=3)
+        return r.status_code == 200
+    except Exception:
+        return False
+
+
 def find_scanner_device() -> str | None:
-    """Auto-detect a barcode scanner by looking for HID devices with 'barcode'
-    or 'scanner' or 'netum' in the name, or any device that has only keys
-    (no mouse axes) which is typical of barcode scanners."""
     devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
     for dev in devices:
         name_lower = dev.name.lower()
@@ -89,7 +144,6 @@ def find_scanner_device() -> str | None:
 
 
 def list_devices():
-    """Print all input devices for debugging."""
     devices = [evdev.InputDevice(path) for path in evdev.list_devices()]
     if not devices:
         print("No input devices found. Are you running as root?")
@@ -102,11 +156,15 @@ def list_devices():
 
 
 def read_barcodes(device_path: str):
-    """Generator that yields complete barcode strings from the HID device."""
     dev = evdev.InputDevice(device_path)
     log.info(f"Grabbing exclusive access to: {dev.name} ({device_path})")
-    dev.grab()
 
+    _state["scanner_device"] = device_path
+    _state["scanner_device_name"] = dev.name
+    _state["usb_connected"] = True
+    save_state()
+
+    dev.grab()
     buffer = []
     shift = False
 
@@ -121,7 +179,7 @@ def read_barcodes(device_path: str):
                 shift = event.value != 0
                 continue
 
-            if event.value != 1:  # only key-down
+            if event.value != 1:
                 continue
 
             if key_event.keycode == "KEY_ENTER":
@@ -136,14 +194,14 @@ def read_barcodes(device_path: str):
                 char = mapped[1] if shift else mapped[0]
                 buffer.append(char)
     finally:
+        _state["usb_connected"] = False
+        save_state()
         dev.ungrab()
 
 
 def handle_scan_out(barcode: str, api_url: str, client: httpx.Client) -> bool:
-    """Process a barcode for scan-out. Returns True on success."""
     base = api_url.rstrip("/")
 
-    # Try as FreezerTrack QR code (JSON with id)
     try:
         data = json.loads(barcode)
         if "id" in data:
@@ -158,7 +216,6 @@ def handle_scan_out(barcode: str, api_url: str, client: httpx.Client) -> bool:
     except (json.JSONDecodeError, TypeError):
         pass
 
-    # Retail barcode: lookup name, then search inventory, then remove oldest
     log.info(f"Looking up barcode: {barcode}")
     try:
         lookup = client.get(f"{base}/api/food/lookup/{barcode}")
@@ -172,7 +229,6 @@ def handle_scan_out(barcode: str, api_url: str, client: httpx.Client) -> bool:
             log.warning(f"NOT FOUND in freezer: {search_name}")
             return False
 
-        # FIFO: remove the oldest item
         oldest = min(items, key=lambda i: i["frozen_date"])
         resp = client.post(f"{base}/api/food/{oldest['id']}/remove")
         if resp.status_code == 200:
@@ -212,23 +268,33 @@ def main():
         log.error("Run with --list-devices to see available input devices.")
         sys.exit(1)
 
+    _state["api_url"] = args.api
+    _state["mode"] = args.mode
+    _state["uptime_since"] = datetime.now(timezone.utc).isoformat()
+
+    client = httpx.Client(timeout=10)
+    _state["api_connected"] = check_api(args.api, client)
+    save_state()
+
     log.info(f"FreezerTrack Scanner Service")
-    log.info(f"  API:    {args.api}")
+    log.info(f"  API:    {args.api} ({'connected' if _state['api_connected'] else 'UNREACHABLE'})")
     log.info(f"  Device: {device_path}")
     log.info(f"  Mode:   scan-{args.mode}")
     log.info(f"Waiting for scans...")
 
-    client = httpx.Client(timeout=10)
-
     try:
         for barcode in read_barcodes(device_path):
             log.info(f"SCANNED: {barcode}")
+
+            _state["api_connected"] = check_api(args.api, client)
 
             if args.mode == "out":
                 success = handle_scan_out(barcode, args.api, client)
             else:
                 log.info(f"Scan-in mode not yet implemented. Barcode: {barcode}")
                 success = False
+
+            record_scan(barcode, success)
 
             if success:
                 log.info(">>> OK")
@@ -241,6 +307,8 @@ def main():
         log.error("Permission denied. Run with sudo or add your user to the 'input' group.")
         sys.exit(1)
     finally:
+        _state["usb_connected"] = False
+        save_state()
         client.close()
 
 
