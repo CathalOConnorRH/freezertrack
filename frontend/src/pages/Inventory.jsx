@@ -9,8 +9,14 @@ import {
   readdItem,
   printLabel,
   deleteItem,
+  updateItem,
 } from "../api/client";
-import { X } from "lucide-react";
+import { X, Pencil, ChevronDown, ChevronUp } from "lucide-react";
+
+const PRESET_CATEGORIES = [
+  "Meat", "Poultry", "Fish", "Vegetables", "Fruit",
+  "Ready Meals", "Soups", "Bread", "Desserts", "Other",
+];
 
 function daysAgo(dateStr) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -42,6 +48,55 @@ export default function Inventory() {
   const [selectedHistory, setSelectedHistory] = useState(null);
   const [actionMsg, setActionMsg] = useState(null);
   const [acting, setActing] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [showItems, setShowItems] = useState(false);
+
+  const startEdit = (item) => {
+    setEditingItem(item.id);
+    setEditForm({
+      name: item.name || "",
+      brand: item.brand || "",
+      category: item.category || "",
+      quantity: item.quantity,
+      frozen_date: item.frozen_date,
+      notes: item.notes || "",
+    });
+    setActionMsg(null);
+  };
+
+  const cancelEdit = () => {
+    setEditingItem(null);
+    setEditForm({});
+  };
+
+  const saveEdit = async () => {
+    setActing(true);
+    try {
+      const changes = {};
+      const orig = selected?.items?.find((i) => i.id === editingItem);
+      if (!orig) return;
+      if (editForm.name !== (orig.name || "")) changes.name = editForm.name;
+      if (editForm.brand !== (orig.brand || "")) changes.brand = editForm.brand || null;
+      if (editForm.category !== (orig.category || "")) changes.category = editForm.category || null;
+      if (editForm.quantity !== orig.quantity) changes.quantity = parseInt(editForm.quantity, 10);
+      if (editForm.frozen_date !== orig.frozen_date) changes.frozen_date = editForm.frozen_date;
+      if (editForm.notes !== (orig.notes || "")) changes.notes = editForm.notes || null;
+
+      if (Object.keys(changes).length === 0) {
+        cancelEdit();
+        return;
+      }
+      await updateItem(editingItem, changes);
+      setActionMsg({ type: "ok", text: "Item updated" });
+      cancelEdit();
+      fetchData();
+    } catch {
+      setActionMsg({ type: "err", text: "Failed to save changes" });
+    } finally {
+      setActing(false);
+    }
+  };
 
   const fetchData = () => {
     const filters = {};
@@ -234,7 +289,7 @@ export default function Inventory() {
       {selected && (
         <div
           className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center"
-          onClick={(e) => e.target === e.currentTarget && setSelected(null)}
+          onClick={(e) => { if (e.target === e.currentTarget) { setSelected(null); cancelEdit(); setShowItems(false); } }}
         >
           <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5 sm:p-6 max-h-[85vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-4">
@@ -245,7 +300,7 @@ export default function Inventory() {
                 )}
               </div>
               <button
-                onClick={() => setSelected(null)}
+                onClick={() => { setSelected(null); cancelEdit(); setShowItems(false); }}
                 className="p-1 -m-1 rounded-lg hover:bg-gray-100"
               >
                 <X size={20} className="text-gray-400" />
@@ -280,7 +335,7 @@ export default function Inventory() {
               </div>
             )}
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 mb-4">
               <button
                 onClick={() => handleRemoveOldest(selected)}
                 disabled={acting}
@@ -305,6 +360,122 @@ export default function Inventory() {
                 Reprint Label
               </button>
             </div>
+
+            {/* Individual items in this group */}
+            <button
+              onClick={() => { setShowItems(!showItems); cancelEdit(); }}
+              className="w-full flex items-center justify-between py-2.5 px-1 text-sm font-medium text-gray-600 hover:text-gray-900"
+            >
+              <span>{selected.items?.length || 0} individual item{selected.items?.length !== 1 ? "s" : ""}</span>
+              {showItems ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+
+            {showItems && selected.items && (
+              <div className="border-t border-gray-100 pt-2 space-y-2">
+                {selected.items.map((item) => (
+                  <div key={item.id} className="bg-gray-50 rounded-lg p-3">
+                    {editingItem === item.id ? (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Name</label>
+                          <input
+                            type="text"
+                            value={editForm.name}
+                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Brand</label>
+                          <input
+                            type="text"
+                            value={editForm.brand}
+                            onChange={(e) => setEditForm({ ...editForm, brand: e.target.value })}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
+                          <select
+                            value={editForm.category}
+                            onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
+                          >
+                            <option value="">None</option>
+                            {[...new Set([...PRESET_CATEGORIES, ...categories])].map((c) => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Quantity</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={editForm.quantity}
+                              onChange={(e) => setEditForm({ ...editForm, quantity: parseInt(e.target.value, 10) || 1 })}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Frozen date</label>
+                            <input
+                              type="date"
+                              value={editForm.frozen_date}
+                              onChange={(e) => setEditForm({ ...editForm, frozen_date: e.target.value })}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Notes</label>
+                          <input
+                            type="text"
+                            value={editForm.notes}
+                            onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                            placeholder="Optional notes..."
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={saveEdit}
+                            disabled={acting}
+                            className="flex-1 py-2 bg-[var(--ice-blue)] text-white rounded-lg text-sm font-medium hover:bg-[#4a9bd9] active:scale-[0.98] disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 active:scale-[0.98]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {item.frozen_date} &middot; x{item.quantity}
+                            {item.category && <> &middot; {item.category}</>}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => startEdit(item)}
+                          className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-700 shrink-0"
+                          title="Edit item"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
