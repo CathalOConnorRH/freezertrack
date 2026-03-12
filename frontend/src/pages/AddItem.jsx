@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { createItem, getCategories, getFreezers, uploadPhoto, saveBarcodeMapping } from "../api/client";
+import { createItem, getCategories, getFreezers, uploadPhoto, saveBarcodeMapping, lookupBarcode } from "../api/client";
+import CameraScanner from "../components/CameraScanner";
+import { Camera, X } from "lucide-react";
 
 const SHELF_LIFE_MAP = {
   meat: 120, poultry: 180, fish: 90, vegetables: 240, fruit: 240,
@@ -30,6 +32,61 @@ export default function AddItem() {
   });
   const [photo, setPhoto] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showCamScanner, setShowCamScanner] = useState(false);
+  const [barcodeLookupMsg, setBarcodeLookupMsg] = useState(null);
+  const barcodeInputRef = useRef(null);
+  const scanBuffer = useRef("");
+  const lastKeyTime = useRef(0);
+
+  const handleBarcodeScan = useCallback(async (code) => {
+    setForm((f) => ({ ...f, barcode: code }));
+    setShowCamScanner(false);
+    setBarcodeLookupMsg("Looking up...");
+    try {
+      const data = await lookupBarcode(code);
+      if (data.found) {
+        setForm((f) => ({
+          ...f,
+          name: f.name || data.name,
+          brand: f.brand || data.brand || "",
+        }));
+        setBarcodeLookupMsg(`Found: ${data.name}`);
+      } else {
+        setBarcodeLookupMsg("Not found in databases — fill in the details manually");
+      }
+    } catch {
+      setBarcodeLookupMsg("Lookup failed");
+    }
+    setTimeout(() => setBarcodeLookupMsg(null), 4000);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (showCamScanner) return;
+      const active = document.activeElement;
+      const isTypingInForm = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT");
+      if (isTypingInForm && active !== barcodeInputRef.current) return;
+
+      const now = Date.now();
+      if (e.key === "Enter" && scanBuffer.current.length >= 6) {
+        handleBarcodeScan(scanBuffer.current);
+        scanBuffer.current = "";
+        lastKeyTime.current = 0;
+        e.preventDefault();
+        return;
+      }
+      if (e.key.length === 1) {
+        if (now - lastKeyTime.current > 80 && lastKeyTime.current !== 0) {
+          scanBuffer.current = e.key;
+        } else {
+          scanBuffer.current += e.key;
+        }
+        lastKeyTime.current = now;
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleBarcodeScan, showCamScanner]);
 
   useEffect(() => {
     getCategories().then(setCategories).catch(() => {});
@@ -117,11 +174,41 @@ export default function AddItem() {
               </span>
             )}
           </label>
-          <input
-            type="text" value={form.barcode} onChange={set("barcode")}
-            className={inputCls} placeholder="Optional — enter or scan a barcode"
-            inputMode="numeric"
-          />
+          <div className="flex gap-2">
+            <input
+              ref={barcodeInputRef}
+              type="text" value={form.barcode}
+              onChange={(e) => setForm((f) => ({ ...f, barcode: e.target.value }))}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && form.barcode.length >= 6) {
+                  e.preventDefault();
+                  handleBarcodeScan(form.barcode);
+                }
+              }}
+              className={inputCls} placeholder="Type, scan, or use camera"
+              inputMode="numeric"
+            />
+            <button
+              type="button"
+              onClick={() => setShowCamScanner(!showCamScanner)}
+              className={`shrink-0 px-3 rounded-lg border transition-colors ${
+                showCamScanner
+                  ? "bg-[var(--ice-blue)] text-white border-[var(--ice-blue)]"
+                  : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
+              }`}
+              title="Scan with camera"
+            >
+              {showCamScanner ? <X size={18} /> : <Camera size={18} />}
+            </button>
+          </div>
+          {barcodeLookupMsg && (
+            <p className="text-xs text-gray-500 mt-1.5">{barcodeLookupMsg}</p>
+          )}
+          {showCamScanner && (
+            <div className="mt-2 rounded-lg overflow-hidden border border-gray-200">
+              <CameraScanner onScan={handleBarcodeScan} />
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
