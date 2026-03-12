@@ -141,6 +141,10 @@ def _store(barcode: str, result: dict) -> None:
     _save_to_db(barcode, result)
 
 
+def clear_mem_cache_entry(barcode: str) -> None:
+    _mem_cache.pop(barcode, None)
+
+
 def clear_cache() -> None:
     _mem_cache.clear()
     try:

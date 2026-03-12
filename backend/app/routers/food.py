@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from PIL import Image
+from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -116,6 +117,39 @@ def search_items(q: str, db: Session = Depends(get_db)):
 @router.get("/lookup/{barcode}")
 async def lookup_barcode_endpoint(barcode: str):
     return await barcode_service.lookup_barcode(barcode, settings)
+
+
+class BarcodeMapping(BaseModel):
+    barcode: str
+    name: str
+    brand: str | None = None
+
+
+@router.post("/barcode")
+def save_barcode_mapping(payload: BarcodeMapping, db: Session = Depends(get_db)):
+    """Save a manual barcode-to-product mapping so future scans resolve it."""
+    from app.models.food import BarcodeCache
+
+    existing = db.query(BarcodeCache).filter(BarcodeCache.barcode == payload.barcode).first()
+    if existing:
+        existing.name = payload.name
+        existing.brand = payload.brand or ""
+        existing.source = "manual"
+        existing.found = True
+        existing.cached_at = datetime.now(timezone.utc)
+    else:
+        entry = BarcodeCache(
+            barcode=payload.barcode,
+            name=payload.name,
+            brand=payload.brand or "",
+            source="manual",
+            found=True,
+            cached_at=datetime.now(timezone.utc),
+        )
+        db.add(entry)
+    db.commit()
+    barcode_service.clear_mem_cache_entry(payload.barcode)
+    return {"saved": True, "barcode": payload.barcode}
 
 
 @router.get("/stats")

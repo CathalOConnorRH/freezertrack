@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { createItem, getCategories, getFreezers, uploadPhoto } from "../api/client";
+import { createItem, getCategories, getFreezers, uploadPhoto, saveBarcodeMapping } from "../api/client";
 
 const SHELF_LIFE_MAP = {
   meat: 120, poultry: 180, fish: 90, vegetables: 240, fruit: 240,
@@ -18,6 +18,7 @@ export default function AddItem() {
   const [form, setForm] = useState({
     name: prefill?.name || "",
     brand: prefill?.brand || "",
+    barcode: location.state?.barcode || "",
     category: "",
     frozen_date: new Date().toISOString().split("T")[0],
     quantity: 1,
@@ -63,6 +64,10 @@ export default function AddItem() {
         auto_print: form.auto_print,
       });
 
+      if (form.barcode && form.name) {
+        await saveBarcodeMapping(form.barcode, form.name, form.brand || null).catch(() => {});
+      }
+
       if (photo && res.items?.length > 0) {
         for (const item of res.items) {
           await uploadPhoto(item.id, photo).catch(() => {});
@@ -100,6 +105,22 @@ export default function AddItem() {
           <input
             type="text" required value={form.name} onChange={set("name")}
             className={inputCls} autoComplete="off"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            Barcode
+            {form.barcode && (
+              <span className="ml-2 inline-block bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">
+                will be saved for future scans
+              </span>
+            )}
+          </label>
+          <input
+            type="text" value={form.barcode} onChange={set("barcode")}
+            className={inputCls} placeholder="Optional — enter or scan a barcode"
+            inputMode="numeric"
           />
         </div>
 
