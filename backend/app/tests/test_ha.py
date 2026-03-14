@@ -3,6 +3,54 @@ from datetime import date, timedelta
 from app.config import settings
 
 
+def test_ha_scan_in_creates_item(client):
+    resp = client.post("/api/ha/scan-in", json={"name": "Peas", "quantity": 2})
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["item"]["name"] == "Peas"
+    assert data["item"]["quantity"] == 2
+    assert data["item"]["frozen_date"] == str(date.today())
+    assert data["state"]["total_items"] == 1
+
+
+def test_ha_scan_in_with_all_fields(client):
+    payload = {
+        "name": "Salmon Fillet",
+        "quantity": 3,
+        "brand": "FishCo",
+        "category": "Fish",
+        "frozen_date": "2025-06-01",
+        "notes": "wild caught",
+    }
+    resp = client.post("/api/ha/scan-in", json=payload)
+    assert resp.status_code == 201
+    item = resp.json()["item"]
+    assert item["name"] == "Salmon Fillet"
+    assert item["brand"] == "FishCo"
+    assert item["category"] == "Fish"
+    assert item["frozen_date"] == "2025-06-01"
+    assert item["quantity"] == 3
+    assert item["shelf_life_days"] == 90  # from SHELF_LIFE_MAP["fish"]
+    assert item["notes"] == "wild caught"
+
+
+def test_ha_scan_in_defaults_frozen_date_to_today(client):
+    resp = client.post("/api/ha/scan-in", json={"name": "Mince"})
+    assert resp.status_code == 201
+    assert resp.json()["item"]["frozen_date"] == str(date.today())
+
+
+def test_ha_scan_in_appears_in_ha_state(client):
+    client.post("/api/ha/scan-in", json={"name": "Chicken", "quantity": 1})
+    client.post("/api/ha/scan-in", json={"name": "Beef", "quantity": 2})
+
+    state = client.get("/api/ha/state").json()
+    assert state["total_items"] == 2
+    names = [i["name"] for i in state["items"]]
+    assert "Chicken" in names
+    assert "Beef" in names
+
+
 def test_ha_state_counts_active_items(client):
     client.post("/api/food", json={"name": "Fresh", "frozen_date": str(date.today() - timedelta(days=7))})
     client.post("/api/food", json={"name": "Old", "frozen_date": str(date.today() - timedelta(days=100))})

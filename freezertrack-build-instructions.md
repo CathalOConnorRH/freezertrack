@@ -551,6 +551,22 @@ Requirements:
      → fetch all items, call build_ha_state(), return result as JSON
    - GET /api/ha/alerts
      → fetch active items, call get_alerts(), return {"alerts": [...]}
+   - POST /api/ha/scan-in
+     → accept a JSON body with item details and add a new item to the freezer inventory.
+     Request body fields:
+       - name (str, required)
+       - quantity (int, default 1)
+       - brand (str | None, optional)
+       - category (str | None, optional)
+       - frozen_date (date | None, optional — defaults to today)
+       - shelf_life_days (int | None, optional — auto-derived from category if omitted)
+       - notes (str | None, optional)
+       - freezer_id (str | None, optional)
+     Response (HTTP 201):
+       {
+         "item": { <FoodItemResponse fields> },
+         "state": { <build_ha_state() result> }
+       }
 
 4. Register the HA router in main.py.
 
@@ -564,6 +580,10 @@ Requirements:
      assert low_stock alert is present
    - Test boundary: item at exactly ALERT_DAYS_FROZEN days → should be included
    - Test item at ALERT_DAYS_FROZEN - 1 days → should NOT be in alerts
+   - Test scan-in: POST /api/ha/scan-in with name and quantity → HTTP 201,
+     item returned with correct fields, frozen_date defaults to today
+   - Test scan-in with all optional fields (brand, category, frozen_date, notes)
+   - Test scan-in updates /api/ha/state (total_items increments correctly)
 ```
 
 ---
@@ -820,6 +840,82 @@ entities:
   - entity: binary_sensor.freezer_has_old_items
     name: Old Items Alert
 ```
+
+### Scanning Items Into the Freezer from Home Assistant
+
+Use the `POST /api/ha/scan-in` endpoint to add new items to the freezer inventory
+directly from Home Assistant (e.g., via a `rest_command` triggered by a button or
+automation).
+
+**Add to `configuration.yaml`:**
+
+```yaml
+rest_command:
+  freezer_scan_in:
+    url: http://[PI_IP]/api/ha/scan-in
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload: >-
+      {
+        "name": "{{ name }}",
+        "quantity": {{ quantity | default(1) }},
+        "brand": "{{ brand | default('') }}",
+        "category": "{{ category | default('') }}",
+        "frozen_date": "{{ frozen_date | default('') }}"
+      }
+```
+
+**Example: call from a script or automation:**
+
+```yaml
+script:
+  add_chicken_to_freezer:
+    sequence:
+      - service: rest_command.freezer_scan_in
+        data:
+          name: "Chicken Breast"
+          quantity: 2
+          category: "Poultry"
+```
+
+**Request body fields** (sent as JSON to `POST /api/ha/scan-in`):
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | ✅ | Item name |
+| `quantity` | integer | no (default: 1) | Number of servings |
+| `brand` | string | no | Brand name |
+| `category` | string | no | Category (e.g. "Fish", "Meat") — also determines shelf life |
+| `frozen_date` | date (YYYY-MM-DD) | no (default: today) | Date item was frozen |
+| `shelf_life_days` | integer | no | Override shelf life in days |
+| `notes` | string | no | Free-text notes |
+| `freezer_id` | string | no | UUID of specific freezer (for multi-freezer setups) |
+
+**Response (HTTP 201):**
+
+```json
+{
+  "item": {
+    "id": "...",
+    "name": "Chicken Breast",
+    "frozen_date": "2025-06-01",
+    "quantity": 2,
+    "category": "Poultry",
+    ...
+  },
+  "state": {
+    "total_items": 5,
+    "oldest_item_days": 42,
+    "items": [...],
+    "alerts": [...]
+  }
+}
+```
+
+The `state` field contains the full updated freezer state, identical to
+`GET /api/ha/state`, so the sensor can be updated immediately without waiting
+for the next poll interval.
 
 ---
 
