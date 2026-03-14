@@ -538,12 +538,15 @@ Requirements:
        "total_items": len(active_items),
        "oldest_item_days": oldest_days,
        "items": [
-         {"id": i.id, "name": i.name, "frozen_date": str(i.frozen_date),
-          "quantity": i.quantity, "days_frozen": days_frozen}
+         {"id": i.id, "name": i.name, "brand": i.brand, "category": i.category,
+          "frozen_date": str(i.frozen_date), "quantity": i.quantity,
+          "days_frozen": days_frozen, "expiration_date": expiration_date,
+          "notes": i.notes, "freezer_id": i.freezer_id}
          for i in active_items
        ],
        "alerts": get_alerts(active_items, settings)
      }
+   - expiration_date is computed as frozen_date + shelf_life_days (or null if shelf_life_days is None)
 
 3. Create `app/routers/homeassistant.py`:
 
@@ -551,6 +554,11 @@ Requirements:
      → fetch all items, call build_ha_state(), return result as JSON
    - GET /api/ha/alerts
      → fetch active items, call get_alerts(), return {"alerts": [...]}
+   - POST /api/ha/scan-out/{item_id}
+     → mark item as removed (same logic as /api/food/{id}/remove)
+     → return {"success": true, "item_id": ..., "name": ..., "removed_at": ...}
+     → 404 if item not found, 400 if already removed
+     → add to shopping list if last item with that name
 
 4. Register the HA router in main.py.
 
@@ -564,6 +572,10 @@ Requirements:
      assert low_stock alert is present
    - Test boundary: item at exactly ALERT_DAYS_FROZEN days → should be included
    - Test item at ALERT_DAYS_FROZEN - 1 days → should NOT be in alerts
+   - Test /api/ha/state returns brand, category, notes, expiration_date fields
+   - Test POST /api/ha/scan-out/{id}: item is marked removed, disappears from state
+   - Test POST /api/ha/scan-out/{id}: 404 for unknown id, 400 if already removed
+   - Test POST /api/ha/scan-out/{id}: adds item to shopping list when last of its kind
 ```
 
 ---
@@ -807,6 +819,59 @@ alert:
     notifiers: notify.mobile_app
 ```
 
+### Item Data Available in Home Assistant
+
+Each entry in `state_attr('sensor.freezer_state', 'items')` contains:
+
+| Field | Description |
+|-------|-------------|
+| `id` | UUID of the item (used for scan-out) |
+| `name` | Item name (e.g. "Chicken Curry") |
+| `brand` | Brand name (or null) |
+| `category` | Category (e.g. "Poultry", or null) |
+| `frozen_date` | Date frozen (YYYY-MM-DD) |
+| `quantity` | Number of servings |
+| `days_frozen` | How many days the item has been in the freezer |
+| `expiration_date` | Computed expiry date (YYYY-MM-DD, or null if no shelf life set) |
+| `notes` | Free-text notes (or null) |
+| `freezer_id` | ID of the freezer it belongs to (or null) |
+
+### Scanning Items Out from Home Assistant
+
+To remove (scan out) an item from the freezer using a Home Assistant automation or script,
+call the REST endpoint with the item's `id`:
+
+```yaml
+# Example Home Assistant REST command configuration
+rest_command:
+  freezer_scan_out:
+    url: "http://[PI_IP]/api/ha/scan-out/{{ item_id }}"
+    method: POST
+```
+
+Use it in an automation or script:
+
+```yaml
+action:
+  - service: rest_command.freezer_scan_out
+    data:
+      item_id: "{{ item_id }}"   # UUID of the item to remove
+```
+
+The endpoint returns:
+
+```json
+{
+  "success": true,
+  "item_id": "uuid-string",
+  "name": "Chicken Curry",
+  "removed_at": "2025-06-01T12:00:00+00:00"
+}
+```
+
+If the scanned-out item was the last one of its kind, it is automatically added to the
+shopping list so you remember to restock.
+
 ### Lovelace Dashboard Card
 
 ```yaml
@@ -913,6 +978,7 @@ QR Code Payload (JSON encoded into QR)
 | POST | /api/labels/{id}/print | Reprint label |
 | GET | /api/ha/state | Full HA sensor payload |
 | GET | /api/ha/alerts | Active alerts only |
+| POST | /api/ha/scan-out/{id} | Scan item out via Home Assistant |
 | GET | /health | Health check |
 
 ---

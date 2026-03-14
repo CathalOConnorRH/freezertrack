@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 from app.config import Settings
 from app.models.food import FoodItem
@@ -14,13 +14,23 @@ def build_ha_state(items: list[FoodItem], settings: Settings) -> dict:
         days_frozen = (date.today() - i.frozen_date).days
         if days_frozen > oldest_days:
             oldest_days = days_frozen
+
+        expiration_date = None
+        if i.shelf_life_days is not None:
+            expiration_date = str(i.frozen_date + timedelta(days=i.shelf_life_days))
+
         item_dicts.append(
             {
                 "id": i.id,
                 "name": i.name,
+                "brand": i.brand,
+                "category": i.category,
                 "frozen_date": str(i.frozen_date),
                 "quantity": i.quantity,
                 "days_frozen": days_frozen,
+                "expiration_date": expiration_date,
+                "notes": i.notes,
+                "freezer_id": i.freezer_id,
             }
         )
 
