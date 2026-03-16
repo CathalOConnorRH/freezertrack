@@ -12,6 +12,7 @@ import Statistics from "./pages/Statistics";
 import ShoppingList from "./pages/ShoppingList";
 import LabelDesigner from "./pages/LabelDesigner";
 import Admin from "./pages/Admin";
+import Debug from "./pages/Debug";
 
 const NAV = [
   { to: "/", label: "Home", icon: LayoutDashboard },
@@ -92,6 +93,7 @@ export default function App() {
           <Route path="/labels" element={<LabelDesigner />} />
           <Route path="/shopping" element={<ShoppingList />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/debug" element={<Debug />} />
         </Routes>
       </main>
 
