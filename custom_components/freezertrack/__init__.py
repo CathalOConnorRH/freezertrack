@@ -122,8 +122,16 @@ def _register_services(
         try:
             if mode == "in":
                 lookup = await client.async_lookup_barcode(barcode)
-                name = lookup.get("name", barcode) if lookup.get("found") else barcode
-                brand = lookup.get("brand") if lookup.get("found") else None
+                if not lookup.get("found"):
+                    msg = (
+                        f"Barcode {barcode} not found in any product database. "
+                        "Add it manually via the FreezerTrack web app."
+                    )
+                    LOGGER.warning(msg)
+                    await _notify(hass, msg)
+                    return
+                name = lookup["name"]
+                brand = lookup.get("brand")
                 result = await client.async_create_item(
                     name=name, barcode=barcode, brand=brand
                 )
