@@ -26,11 +26,10 @@ async def lookup_barcode(barcode: str, settings: Settings) -> dict:
         _store(barcode, result)
         return result
 
-    if settings.UPC_ITEM_DB_KEY:
-        result = await _try_upc_item_db(barcode)
-        if result:
-            _store(barcode, result)
-            return result
+    result = await _try_upc_item_db(barcode, settings.UPC_ITEM_DB_KEY)
+    if result:
+        _store(barcode, result)
+        return result
 
     if settings.BARCODE_LOOKUP_API_KEY:
         result = await _try_barcode_lookup(barcode, settings.BARCODE_LOOKUP_API_KEY)
@@ -118,11 +117,16 @@ async def _try_open_food_facts(barcode: str) -> dict | None:
     return None
 
 
-async def _try_upc_item_db(barcode: str) -> dict | None:
-    url = f"https://api.upcitemdb.com/prod/trial/lookup?upc={barcode}"
+async def _try_upc_item_db(barcode: str, api_key: str = "") -> dict | None:
+    if api_key:
+        url = f"https://api.upcitemdb.com/prod/v1/lookup?upc={barcode}"
+        headers = {"Accept": "application/json", "user_key": api_key, "key_type": "3scale"}
+    else:
+        url = f"https://api.upcitemdb.com/prod/trial/lookup?upc={barcode}"
+        headers = {"Accept": "application/json"}
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(url, headers={"Accept": "application/json"})
+            resp = await client.get(url, headers=headers)
             if resp.status_code == 200:
                 data = resp.json()
                 items = data.get("items", [])
