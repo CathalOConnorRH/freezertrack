@@ -242,6 +242,7 @@ podman-compose restart nginx
 | `NIIMBOT_MAC` | `AA:BB:CC:DD:EE:FF` | Bluetooth MAC of Niimbot B1 |
 | `AUTO_PRINT` | `true` | Auto-print label on item creation |
 | `UPC_ITEM_DB_KEY` | *(empty)* | Optional UPC Item DB API key |
+| `BARCODE_LOOKUP_API_KEY` | *(empty)* | Optional [barcodelookup.com](https://www.barcodelookup.com/api) API key |
 | `BARCODE_CACHE_TTL_SECONDS` | `86400` | Barcode lookup cache duration |
 | `ALERT_DAYS_FROZEN` | `90` | Days before item flagged as old |
 | `LOW_STOCK_THRESHOLD` | `5` | Alert when fewer items than this |

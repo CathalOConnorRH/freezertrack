@@ -32,6 +32,12 @@ async def lookup_barcode(barcode: str, settings: Settings) -> dict:
             _store(barcode, result)
             return result
 
+    if settings.BARCODE_LOOKUP_API_KEY:
+        result = await _try_barcode_lookup(barcode, settings.BARCODE_LOOKUP_API_KEY)
+        if result:
+            _store(barcode, result)
+            return result
+
     not_found = {"found": False}
     _store(barcode, not_found)
     return not_found
@@ -125,6 +131,26 @@ async def _try_upc_item_db(barcode: str) -> dict | None:
                         "name": items[0].get("title", ""),
                         "brand": items[0].get("brand", ""),
                         "source": "upc_item_db",
+                        "found": True,
+                    }
+    except (httpx.HTTPError, TimeoutError):
+        pass
+    return None
+
+
+async def _try_barcode_lookup(barcode: str, api_key: str) -> dict | None:
+    url = f"https://api.barcodelookup.com/v3/products?barcode={barcode}&key={api_key}"
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                data = resp.json()
+                products = data.get("products", [])
+                if products:
+                    return {
+                        "name": products[0].get("title", ""),
+                        "brand": products[0].get("brand", ""),
+                        "source": "barcode_lookup",
                         "found": True,
                     }
     except (httpx.HTTPError, TimeoutError):
