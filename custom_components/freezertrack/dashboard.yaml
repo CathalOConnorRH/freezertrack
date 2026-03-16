@@ -1,0 +1,131 @@
+# FreezerTrack Dashboard for Home Assistant
+#
+# Prerequisites:
+#   1. FreezerTrack integration installed and configured
+#   2. Create an input_text helper for barcode scanning:
+#        Go to Settings > Devices & Services > Helpers > Create Helper > Text
+#        Name: "FreezerTrack Barcode"
+#        Entity ID: input_text.freezertrack_barcode
+#        Max length: 30
+#
+# To install:
+#   1. Go to your HA dashboard
+#   2. Click the three dots (top-right) > Edit Dashboard > Raw Configuration Editor
+#   3. Add a new view with the YAML below
+#
+# Alternatively, create a new dashboard and paste this entire file.
+
+title: FreezerTrack
+views:
+  - title: Freezer
+    path: freezer
+    icon: mdi:fridge
+    cards:
+      # ── Overview stats ────────────────────────────────────────────────
+      - type: horizontal-stack
+        cards:
+          - type: entity
+            entity: sensor.freezertrack_total_items
+            name: Items
+            icon: mdi:fridge
+          - type: entity
+            entity: sensor.freezertrack_oldest_item_days
+            name: Oldest
+            icon: mdi:clock-alert-outline
+          - type: entity
+            entity: sensor.freezertrack_alert_count
+            name: Alerts
+            icon: mdi:alert-circle-outline
+
+      # ── Alerts ────────────────────────────────────────────────────────
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: binary_sensor.freezertrack_low_stock
+            state: "on"
+        card:
+          type: markdown
+          content: >-
+            ## ⚠️ Low Stock
+
+            You have **{{ state_attr('binary_sensor.freezertrack_low_stock',
+            'current_count') }}** items — below the threshold of
+            {{ state_attr('binary_sensor.freezertrack_low_stock', 'threshold') }}.
+
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: binary_sensor.freezertrack_old_items
+            state: "on"
+        card:
+          type: markdown
+          content: >-
+            ## ⏰ Old Items
+
+            {% set items = state_attr('binary_sensor.freezertrack_old_items', 'items') %}
+            {% if items %}
+            {% for item in items %}
+            - **{{ item.name }}** — {{ item.days_frozen }} days
+            {% endfor %}
+            {% endif %}
+
+      # ── Scanner ───────────────────────────────────────────────────────
+      - type: entities
+        title: Scanner
+        entities:
+          - entity: select.freezertrack_scanner_mode
+            name: Mode
+          - entity: input_text.freezertrack_barcode
+            name: Barcode
+
+      - type: horizontal-stack
+        cards:
+          - type: button
+            name: Scan
+            icon: mdi:barcode-scan
+            tap_action:
+              action: call-service
+              service: freezertrack.scan_barcode
+              data:
+                barcode: "{{ states('input_text.freezertrack_barcode') }}"
+            hold_action:
+              action: none
+          - type: button
+            name: Clear
+            icon: mdi:close
+            tap_action:
+              action: call-service
+              service: input_text.set_value
+              data:
+                entity_id: input_text.freezertrack_barcode
+                value: ""
+            hold_action:
+              action: none
+
+      # ── Categories ────────────────────────────────────────────────────
+      - type: markdown
+        title: Categories
+        content: >-
+          {% set cats = state_attr('sensor.freezertrack_categories', 'category_list') %}
+          {% if cats %}
+          {% for cat in cats %}
+          `{{ cat }}`{% if not loop.last %} · {% endif %}
+          {% endfor %}
+          {% else %}
+          No categories yet.
+          {% endif %}
+
+      # ── Items list ────────────────────────────────────────────────────
+      - type: markdown
+        title: Freezer Contents
+        content: >-
+          {% set items = state_attr('sensor.freezertrack_total_items', 'items') %}
+          {% if items and items | length > 0 %}
+          | Item | Qty | Frozen | Days |
+          |------|-----|--------|------|
+          {% for item in items | sort(attribute='days_frozen', reverse=true) %}
+          | {{ item.name }} | {{ item.quantity }} | {{ item.frozen_date }} | {{ item.days_frozen }}d |
+          {% endfor %}
+          {% else %}
+          Your freezer is empty.
+          {% endif %}

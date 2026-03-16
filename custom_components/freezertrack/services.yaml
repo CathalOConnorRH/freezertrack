@@ -1,0 +1,58 @@
+scan_barcode:
+  name: Scan barcode
+  description: >-
+    Process a barcode using the current scanner mode. In "Scan In" mode the
+    barcode is looked up and a new item is created. In "Scan Out" mode the
+    matching item is removed.
+  fields:
+    barcode:
+      name: Barcode
+      description: The retail barcode string to scan.
+      required: true
+      selector:
+        text:
+
+add_item:
+  name: Add item
+  description: Add a new item to the freezer.
+  fields:
+    name:
+      name: Name
+      description: Item name.
+      required: true
+      selector:
+        text:
+    barcode:
+      name: Barcode
+      description: Retail barcode (optional).
+      selector:
+        text:
+    brand:
+      name: Brand
+      description: Brand name (optional).
+      selector:
+        text:
+    category:
+      name: Category
+      description: Category (optional).
+      selector:
+        text:
+    quantity:
+      name: Quantity
+      description: Number of servings.
+      default: 1
+      selector:
+        number:
+          min: 1
+          max: 100
+
+remove_item:
+  name: Remove item
+  description: Remove a specific item from the freezer by its ID.
+  fields:
+    item_id:
+      name: Item ID
+      description: The UUID of the item to remove.
+      required: true
+      selector:
+        text:

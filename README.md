@@ -154,9 +154,57 @@ Then set `NIIMBOT_MAC=AA:BB:CC:DD:EE:FF` in your `.env` file.
 - **Local network**: http://raspberrypi.local:8080
 - **Direct IP**: http://192.168.x.x:8080 (use your Pi's IP address)
 
-## Home Assistant Setup
+## Home Assistant Integration
 
-Add the following to your Home Assistant `configuration.yaml`:
+FreezerTrack includes a full custom integration for Home Assistant with HACS support.
+
+### Install via HACS (recommended)
+
+1. Open HACS in Home Assistant
+2. Click the three dots (top-right) > **Custom repositories**
+3. Add `https://github.com/CathalOConnorRH/freezertrack` as an **Integration**
+4. Search for "FreezerTrack" and install it
+5. Restart Home Assistant
+6. Go to **Settings > Devices & Services > Add Integration > FreezerTrack**
+7. Enter your FreezerTrack URL (e.g. `http://192.168.1.100`)
+
+### Manual install
+
+Copy the `custom_components/freezertrack` folder into your Home Assistant `config/custom_components/` directory and restart.
+
+### What you get
+
+**Sensors:**
+- `sensor.freezertrack_total_items` — active item count with full items list in attributes
+- `sensor.freezertrack_oldest_item_days` — age of oldest frozen item
+- `sensor.freezertrack_alert_count` — number of active alerts
+- `sensor.freezertrack_categories` — category count with category list in attributes
+
+**Binary sensors:**
+- `binary_sensor.freezertrack_low_stock` — on when below threshold
+- `binary_sensor.freezertrack_old_items` — on when items exceed age threshold
+
+**Select:**
+- `select.freezertrack_scanner_mode` — toggle between Scan In / Scan Out
+
+**Services (for automations):**
+- `freezertrack.scan_barcode` — process a barcode in the current scan mode
+- `freezertrack.add_item` — add an item by name, barcode, brand, category, quantity
+- `freezertrack.remove_item` — remove a specific item by ID
+
+### Dashboard
+
+A pre-built Lovelace dashboard is included at `custom_components/freezertrack/dashboard.yaml`. To use it:
+
+1. Create an `input_text` helper: **Settings > Devices & Services > Helpers > Create Helper > Text**, name it "FreezerTrack Barcode" (entity ID: `input_text.freezertrack_barcode`)
+2. Create a new dashboard or edit an existing one
+3. Open the Raw Configuration Editor and paste the contents of `dashboard.yaml`
+
+The dashboard shows item stats, alerts, category tags, a full inventory table, and a scanner section with mode toggle + barcode input.
+
+### Legacy REST sensor (alternative)
+
+If you prefer a simple REST sensor without the custom integration:
 
 ```yaml
 sensor:
@@ -170,8 +218,6 @@ sensor:
       - alerts
       - oldest_item_days
 ```
-
-See the full configuration reference in `freezertrack-build-instructions.md`.
 
 ## Enabling HTTPS for Mobile Camera
 
