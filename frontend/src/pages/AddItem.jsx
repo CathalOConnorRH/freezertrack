@@ -32,6 +32,7 @@ export default function AddItem() {
   });
   const [photo, setPhoto] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
   const [showCamScanner, setShowCamScanner] = useState(false);
   const [barcodeLookupMsg, setBarcodeLookupMsg] = useState(null);
   const barcodeInputRef = useRef(null);
@@ -134,7 +135,7 @@ export default function AddItem() {
 
       navigate(cameFromScanner ? "/scan" : "/", { replace: true });
     } catch {
-      alert("Failed to add item");
+      setSubmitError("Failed to add item. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -305,6 +306,12 @@ export default function AddItem() {
           />
           <span className="text-sm text-gray-700">Print label{totalItems > 1 ? "s" : ""}</span>
         </label>
+
+        {submitError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm font-medium text-red-700">
+            {submitError}
+          </div>
+        )}
 
         <button
           type="submit" disabled={submitting}

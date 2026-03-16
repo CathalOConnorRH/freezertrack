@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { removeItem, decrementItem, lookupBarcode, searchItems, getItemsByBarcode, getScannerMode, setScannerMode } from "../api/client";
 import ScanInput from "../components/ScanInput";
@@ -14,13 +14,18 @@ export default function Scanner() {
   const [matches, setMatches] = useState(null);
   const [removing, setRemoving] = useState(null);
   const navigate = useNavigate();
+  const intervalRef = useRef(null);
 
   useEffect(() => {
-    getScannerMode().then((s) => setMode(s.mode)).catch(() => {});
-    const id = setInterval(() => {
-      getScannerMode().then((s) => setMode(s.mode)).catch(() => {});
-    }, 3000);
-    return () => clearInterval(id);
+    const poll = () => getScannerMode().then((s) => setMode(s.mode)).catch(() => {});
+    poll();
+    const start = () => { intervalRef.current = setInterval(poll, 3000); };
+    const stop = () => clearInterval(intervalRef.current);
+
+    start();
+    const onVisibility = () => { document.hidden ? stop() : start(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => { stop(); document.removeEventListener("visibilitychange", onVisibility); };
   }, []);
 
   const changeMode = useCallback((m) => {

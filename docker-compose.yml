@@ -2,9 +2,10 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
+    # Uncomment cap_add if using Bluetooth label printing from Docker:
+    # cap_add:
+    #   - NET_ADMIN
+    #   - NET_RAW
     volumes:
       - ./data:/app/data
     env_file: .env

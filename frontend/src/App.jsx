@@ -58,7 +58,7 @@ export default function App() {
           <h1 className="text-xl font-bold tracking-tight">FreezerTrack</h1>
           <p className="text-xs text-gray-400 mt-1">Freezer Inventory</p>
         </div>
-        <nav className="flex flex-col gap-1 flex-1">
+        <nav aria-label="Main navigation" className="flex flex-col gap-1 flex-1">
           {[...NAV, ...SIDEBAR_ONLY].map((n) => (
             <NavItem key={n.to} {...n} />
           ))}
@@ -69,13 +69,13 @@ export default function App() {
       <header className="md:hidden sticky top-0 z-40 bg-[var(--navy)] text-white px-4 py-3 flex items-center justify-between">
         <h1 className="text-lg font-bold tracking-tight">FreezerTrack</h1>
         <div className="flex gap-3">
-          <NavLink to="/stats" className={({ isActive }) => isActive ? "text-[var(--ice-blue)]" : "text-gray-400"}>
+          <NavLink to="/stats" aria-label="Statistics" className={({ isActive }) => isActive ? "text-[var(--ice-blue)]" : "text-gray-400"}>
             <BarChart3 size={20} />
           </NavLink>
-          <NavLink to="/labels" className={({ isActive }) => isActive ? "text-[var(--ice-blue)]" : "text-gray-400"}>
+          <NavLink to="/labels" aria-label="Label Designer" className={({ isActive }) => isActive ? "text-[var(--ice-blue)]" : "text-gray-400"}>
             <Tag size={20} />
           </NavLink>
-          <NavLink to="/admin" className={({ isActive }) => isActive ? "text-[var(--ice-blue)]" : "text-gray-400"}>
+          <NavLink to="/admin" aria-label="Admin Settings" className={({ isActive }) => isActive ? "text-[var(--ice-blue)]" : "text-gray-400"}>
             <Settings size={20} />
           </NavLink>
         </div>
@@ -96,7 +96,7 @@ export default function App() {
       </main>
 
       {/* Mobile Bottom Tab Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[var(--surface)] border-t border-[var(--border)] flex justify-around px-1 pt-2 safe-bottom z-50">
+      <nav aria-label="Mobile navigation" className="md:hidden fixed bottom-0 left-0 right-0 bg-[var(--surface)] border-t border-[var(--border)] flex justify-around px-1 pt-2 safe-bottom z-50">
         {NAV.map(({ to, label, icon: Icon }) => {
           const active =
             to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);

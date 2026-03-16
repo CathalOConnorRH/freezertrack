@@ -11,7 +11,9 @@ import {
   deleteItem,
   updateItem,
 } from "../api/client";
-import { X, Pencil, ChevronDown, ChevronUp } from "lucide-react";
+import { Pencil, ChevronDown, ChevronUp } from "lucide-react";
+import Modal from "../components/Modal";
+import TabButton from "../components/TabButton";
 
 const PRESET_CATEGORIES = [
   "Meat", "Poultry", "Fish", "Vegetables", "Fruit",
@@ -288,26 +290,16 @@ export default function Inventory() {
       )}
 
       {/* Group Detail Panel */}
-      {selected && (
-        <div
-          className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center"
-          onClick={(e) => { if (e.target === e.currentTarget) { setSelected(null); cancelEdit(); setShowItems(false); } }}
-        >
-          <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5 sm:p-6 max-h-[85vh] overflow-y-auto">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-lg font-bold">{selected.name}</h3>
-                {selected.brand && (
-                  <p className="text-sm text-gray-500">{selected.brand}</p>
-                )}
-              </div>
-              <button
-                onClick={() => { setSelected(null); cancelEdit(); setShowItems(false); }}
-                className="p-1 -m-1 rounded-lg hover:bg-gray-100"
-              >
-                <X size={20} className="text-gray-400" />
-              </button>
-            </div>
+      <Modal
+        open={!!selected}
+        onClose={() => { setSelected(null); cancelEdit(); setShowItems(false); }}
+        title={selected?.name || ""}
+      >
+        {selected && (
+          <div>
+            {selected.brand && (
+              <p className="text-sm text-[var(--text-secondary)] -mt-2 mb-4">{selected.brand}</p>
+            )}
 
             <div className="grid grid-cols-2 gap-3 mb-5">
               <div className="bg-gray-50 rounded-lg p-3 text-center">
@@ -491,30 +483,20 @@ export default function Inventory() {
               </div>
             )}
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
       {/* History Detail Panel */}
-      {selectedHistory && (
-        <div
-          className="fixed inset-0 bg-black/40 z-50 flex items-end md:items-center justify-center"
-          onClick={(e) => e.target === e.currentTarget && setSelectedHistory(null)}
-        >
-          <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5 sm:p-6">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-lg font-bold">{selectedHistory.name}</h3>
-                {selectedHistory.brand && (
-                  <p className="text-sm text-gray-500">{selectedHistory.brand}</p>
-                )}
-              </div>
-              <button
-                onClick={() => setSelectedHistory(null)}
-                className="p-1 -m-1 rounded-lg hover:bg-gray-100"
-              >
-                <X size={20} className="text-gray-400" />
-              </button>
-            </div>
-            <div className="space-y-2 text-sm text-gray-600 mb-5">
+      <Modal
+        open={!!selectedHistory}
+        onClose={() => setSelectedHistory(null)}
+        title={selectedHistory?.name || ""}
+      >
+        {selectedHistory && (
+          <div>
+            {selectedHistory.brand && (
+              <p className="text-sm text-[var(--text-secondary)] -mt-2 mb-4">{selectedHistory.brand}</p>
+            )}
+            <div className="space-y-2 text-sm text-[var(--text-secondary)] mb-5">
               <p>Was frozen: {selectedHistory.frozen_date}</p>
               <p>Quantity: {selectedHistory.quantity} serving(s)</p>
               {selectedHistory.category && <p>Category: {selectedHistory.category}</p>}
@@ -544,35 +526,25 @@ export default function Inventory() {
               </button>
               <button
                 onClick={async () => {
-                  if (confirm(`Permanently delete ${selectedHistory.name}?`)) {
+                  setActing(true);
+                  try {
                     await deleteItem(selectedHistory.id);
                     setSelectedHistory(null);
                     fetchData();
+                  } catch {
+                    setActionMsg({ type: "err", text: "Failed to delete" });
                   }
+                  setActing(false);
                 }}
-                className="py-3 sm:py-2.5 px-4 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 active:scale-[0.98]"
+                disabled={acting}
+                className="py-3 sm:py-2.5 px-4 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 active:scale-[0.98] disabled:opacity-50"
               >
                 Delete
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
-  );
-}
-
-function TabButton({ active, onClick, label }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-colors active:scale-[0.98] ${
-        active
-          ? "bg-[var(--ice-blue)] text-white"
-          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-      }`}
-    >
-      {label}
-    </button>
   );
 }

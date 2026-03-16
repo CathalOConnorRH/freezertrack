@@ -84,7 +84,7 @@ export default function Statistics() {
         <StatCard label="Avg Age" value={`${stats.average_age_days}d`} color="text-amber-600" />
       </div>
 
-      <section className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 mb-4 sm:mb-6">
+      <section className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 sm:p-6 mb-4 sm:mb-6">
         <h3 className="text-base sm:text-lg font-semibold mb-3">Weekly Activity</h3>
         <div className="h-48 sm:h-64">
           <Bar data={timelineData} options={{ ...chartOpts, plugins: { legend: { display: true, position: "top" } } }} />
@@ -92,14 +92,14 @@ export default function Statistics() {
       </section>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <section className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
+        <section className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 sm:p-6">
           <h3 className="text-base sm:text-lg font-semibold mb-3">Most Frozen Items</h3>
           <div className="h-48 sm:h-64">
             <Bar data={topItemsData} options={{ ...chartOpts, indexAxis: "y" }} />
           </div>
         </section>
 
-        <section className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6">
+        <section className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 sm:p-6">
           <h3 className="text-base sm:text-lg font-semibold mb-3">By Category</h3>
           {stats.categories.length > 0 ? (
             <div className="space-y-2">
@@ -121,9 +121,9 @@ export default function Statistics() {
 
 function StatCard({ label, value, color }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 px-3 py-3 sm:p-4 text-center">
+    <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] px-3 py-3 sm:p-4 text-center">
       <p className={`text-2xl sm:text-3xl font-bold ${color}`}>{value}</p>
-      <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 leading-tight">{label}</p>
+      <p className="text-[10px] sm:text-xs text-[var(--text-secondary)] mt-0.5 leading-tight">{label}</p>
     </div>
   );
 }

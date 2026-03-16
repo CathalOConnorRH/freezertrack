@@ -62,20 +62,23 @@ def suggest_items(db: Session = Depends(get_db)):
         .all()
     )
 
+    active_names = {
+        row[0].lower()
+        for row in db.query(FoodItem.name)
+        .filter(FoodItem.removed_at.is_(None))
+        .all()
+    }
+    shopping_names = {
+        row[0].lower()
+        for row in db.query(ShoppingItem.name)
+        .filter(ShoppingItem.completed_at.is_(None))
+        .all()
+    }
+
     suggestions: dict[str, dict] = {}
     for item in recently_removed:
         key = item.name.lower()
-        active_count = (
-            db.query(FoodItem)
-            .filter(FoodItem.name.ilike(item.name), FoodItem.removed_at.is_(None))
-            .count()
-        )
-        already_on_list = (
-            db.query(ShoppingItem)
-            .filter(ShoppingItem.name.ilike(item.name), ShoppingItem.completed_at.is_(None))
-            .count()
-        )
-        if active_count == 0 and already_on_list == 0 and key not in suggestions:
+        if key not in active_names and key not in shopping_names and key not in suggestions:
             suggestions[key] = {"name": item.name, "brand": item.brand}
 
     return list(suggestions.values())
