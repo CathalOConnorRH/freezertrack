@@ -231,6 +231,7 @@ def create_item(payload: FoodItemCreate, db: Session = Depends(get_db)):
     if shelf_life is None and payload.category:
         shelf_life = SHELF_LIFE_MAP.get(payload.category.lower())
 
+    items = []
     for _ in range(containers):
         item_id = str(uuid.uuid4())
         item = FoodItem(
@@ -247,9 +248,13 @@ def create_item(payload: FoodItemCreate, db: Session = Depends(get_db)):
             qr_code_id=item_id,
         )
         db.add(item)
-        db.commit()
+        items.append(item)
+
+    db.commit()
+    for item in items:
         db.refresh(item)
 
+    for item in items:
         if payload.auto_print and settings.AUTO_PRINT:
             os.makedirs(LABEL_DIR, exist_ok=True)
             qr_path = os.path.join(LABEL_DIR, f"{item.id}_qr.png")
@@ -389,17 +394,32 @@ def readd_item(item_id: str, db: Session = Depends(get_db)):
     return FoodItemResponse.model_validate(item).model_dump(mode="json")
 
 
+MAX_PHOTO_BYTES = 10 * 1024 * 1024
+
+
 @router.post("/{item_id}/photo")
 async def upload_photo(item_id: str, file: UploadFile, db: Session = Depends(get_db)):
     item = db.query(FoodItem).filter(FoodItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
+    if file.content_type and not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    content = await file.read()
+    if len(content) > MAX_PHOTO_BYTES:
+        raise HTTPException(status_code=400, detail="File too large (max 10 MB)")
+
+    import io as _io
+
+    try:
+        img = Image.open(_io.BytesIO(content))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid image file")
+
     os.makedirs(PHOTO_DIR, exist_ok=True)
     photo_path = os.path.join(PHOTO_DIR, f"{item_id}.jpg")
 
-    content = await file.read()
-    img = Image.open(__import__("io").BytesIO(content))
     img.thumbnail((800, 800))
     img = img.convert("RGB")
     img.save(photo_path, "JPEG", quality=85)
@@ -414,7 +434,13 @@ def get_photo(item_id: str, db: Session = Depends(get_db)):
     item = db.query(FoodItem).filter(FoodItem.id == item_id).first()
     if not item or not item.photo_path or not os.path.exists(item.photo_path):
         raise HTTPException(status_code=404, detail="Photo not found")
-    return FileResponse(item.photo_path, media_type="image/jpeg")
+
+    real_photo = os.path.realpath(item.photo_path)
+    real_dir = os.path.realpath(PHOTO_DIR)
+    if not real_photo.startswith(real_dir + os.sep):
+        raise HTTPException(status_code=404, detail="Photo not found")
+
+    return FileResponse(real_photo, media_type="image/jpeg")
 
 
 @router.delete("/{item_id}", status_code=204)

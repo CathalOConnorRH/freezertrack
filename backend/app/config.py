@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     ALERT_DAYS_FROZEN: int = 90
     LOW_STOCK_THRESHOLD: int = 5
     SECRET_KEY: str = "changeme"
+    ADMIN_TOKEN: str = ""
+    CORS_ORIGINS: str = "*"
     LABEL_WIDTH: int = 400
     LABEL_HEIGHT: int = 240
     LABEL_FONT_SIZE: int = 22

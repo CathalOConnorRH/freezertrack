@@ -8,6 +8,7 @@ from the scanner process via a JSON file.
 Runs on port 8888 by default.
 """
 
+import html
 import json
 import os
 import socket
@@ -217,7 +218,8 @@ async function refresh() {
     document.getElementById('api-status').innerHTML = statusDot(s.api_connected);
     document.getElementById('usb-status').innerHTML = statusDot(s.usb_connected);
     document.getElementById('uptime').textContent = s.uptime_since ? new Date(s.uptime_since).toLocaleString() : '-';
-    document.getElementById('last-barcode').textContent = s.last_scan ? (s.last_scan.length > 30 ? s.last_scan.slice(0,30)+'...' : s.last_scan) : 'None';
+    const lb = s.last_scan ? (s.last_scan.length > 30 ? s.last_scan.slice(0,30)+'...' : s.last_scan) : 'None';
+    document.getElementById('last-barcode').textContent = lb;
     document.getElementById('last-result').innerHTML = s.last_scan_result === 'ok'
       ? '<span class="badge ok">OK</span>'
       : s.last_scan_result === 'fail'
@@ -227,13 +229,16 @@ async function refresh() {
 
     const hist = s.scan_history || [];
     if (hist.length > 0) {
-      document.getElementById('history').innerHTML = hist.map(h =>
-        `<div class="history-item">
-          <span class="barcode">${h.barcode.length > 25 ? h.barcode.slice(0,25)+'...' : h.barcode}</span>
+      document.getElementById('history').innerHTML = hist.map(h => {
+        const bc = document.createElement('span');
+        bc.textContent = h.barcode.length > 25 ? h.barcode.slice(0,25)+'...' : h.barcode;
+        const safe = bc.textContent;
+        return `<div class="history-item">
+          <span class="barcode">${safe}</span>
           <span class="badge ${h.success ? 'ok' : 'fail'}">${h.success ? 'OK' : 'FAIL'}</span>
           <span class="time">${relTime(h.time)}</span>
-        </div>`
-      ).join('');
+        </div>`;
+      }).join('');
     }
   } catch {}
 }

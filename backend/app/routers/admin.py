@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -18,6 +19,17 @@ from app.models.food import FoodItem
 from app.schemas.food import FoodItemResponse
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+_bearer = HTTPBearer(auto_error=False)
+
+
+async def _verify_admin(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> None:
+    token = settings.ADMIN_TOKEN
+    if not token:
+        return
+    if not creds or creds.credentials != token:
+        raise HTTPException(status_code=401, detail="Invalid or missing admin token")
 
 _SEARCH_PATHS = [
     os.environ.get("FREEZERTRACK_ENV_PATH", ""),
@@ -80,7 +92,8 @@ def _write_env(data: dict) -> None:
     path = _resolve_env_path()
     lines = []
     for key, value in data.items():
-        lines.append(f"{key}={value}")
+        clean = str(value).replace("\n", "").replace("\r", "").replace("\0", "")
+        lines.append(f"{key}={clean}")
     with open(path, "w") as f:
         f.write("\n".join(lines) + "\n")
 
@@ -98,7 +111,7 @@ def _get_db_path() -> str:
 
 
 @router.get("/config")
-def get_config():
+def get_config(_: None = Depends(_verify_admin)):
     try:
         env_path = _resolve_env_path()
         env = _read_env()
@@ -125,7 +138,7 @@ class ConfigUpdate(BaseModel):
 
 
 @router.patch("/config")
-def update_config(payload: ConfigUpdate):
+def update_config(payload: ConfigUpdate, _: None = Depends(_verify_admin)):
     env = _read_env()
     changed = []
     for key, value in payload.settings.items():
@@ -145,7 +158,7 @@ def update_config(payload: ConfigUpdate):
 
 
 @router.get("/export/csv")
-def export_csv(active_only: bool = False, db: Session = Depends(get_db)):
+def export_csv(active_only: bool = False, db: Session = Depends(get_db), _: None = Depends(_verify_admin)):
     query = db.query(FoodItem)
     if active_only:
         query = query.filter(FoodItem.removed_at.is_(None))
@@ -176,7 +189,7 @@ def export_csv(active_only: bool = False, db: Session = Depends(get_db)):
 
 
 @router.get("/export/json")
-def export_json(active_only: bool = False, db: Session = Depends(get_db)):
+def export_json(active_only: bool = False, db: Session = Depends(get_db), _: None = Depends(_verify_admin)):
     query = db.query(FoodItem)
     if active_only:
         query = query.filter(FoodItem.removed_at.is_(None))
@@ -198,7 +211,7 @@ def export_json(active_only: bool = False, db: Session = Depends(get_db)):
 
 
 @router.get("/backup")
-def download_backup():
+def download_backup(_: None = Depends(_verify_admin)):
     db_path = _get_db_path()
     if not db_path or not os.path.exists(db_path):
         raise HTTPException(status_code=404, detail="Database file not found")
@@ -213,7 +226,7 @@ def download_backup():
 
 
 @router.post("/restore")
-async def restore_backup(file: UploadFile, confirm: bool = False):
+async def restore_backup(file: UploadFile, confirm: bool = False, _: None = Depends(_verify_admin)):
     if not confirm:
         raise HTTPException(
             status_code=400,
@@ -246,7 +259,7 @@ async def restore_backup(file: UploadFile, confirm: bool = False):
 
 
 @router.post("/update")
-def trigger_update():
+def trigger_update(_: None = Depends(_verify_admin)):
     if _update_state["running"]:
         raise HTTPException(status_code=409, detail="Update already in progress")
 
@@ -256,13 +269,19 @@ def trigger_update():
     _update_state["finished_at"] = None
     _update_state["exit_code"] = None
 
+    install_dir = os.environ.get("FREEZERTRACK_INSTALL_DIR", "/opt/freezertrack")
+
     def run():
         try:
             proc = subprocess.Popen(
                 [
                     "bash",
                     "-c",
-                    "curl -fsSL https://raw.githubusercontent.com/CathalOConnorRH/freezertrack/main/install.sh | bash",
+                    f"cd {install_dir} && git pull --ff-only 2>&1"
+                    f" && cd {install_dir}/backend && venv/bin/pip install -r requirements.txt -q 2>&1"
+                    f" && cd {install_dir}/frontend && npm ci --silent 2>&1 && npm run build --silent 2>&1"
+                    f" && rm -rf /var/www/freezertrack/* && cp -r dist/* /var/www/freezertrack/ 2>&1"
+                    f" && cd {install_dir}/backend && venv/bin/alembic upgrade head 2>&1",
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -284,12 +303,12 @@ def trigger_update():
 
 
 @router.get("/update/status")
-def update_status():
+def update_status(_: None = Depends(_verify_admin)):
     return _update_state
 
 
 @router.post("/restart")
-def restart_service():
+def restart_service(_: None = Depends(_verify_admin)):
     try:
         result = subprocess.run(
             ["systemctl", "restart", "freezertrack"],

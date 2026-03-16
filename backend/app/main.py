@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import settings
 from app.database import Base, engine
 from app.routers import admin, food, freezers, homeassistant, labels, scanner, shopping
 
@@ -15,9 +16,11 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="FreezerTrack", lifespan=lifespan)
 
+_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

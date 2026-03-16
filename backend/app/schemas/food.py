@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta
 
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 DEFAULT_SHELF_LIFE_DAYS = 180
 
@@ -19,28 +19,28 @@ SHELF_LIFE_MAP = {
 
 
 class FoodItemCreate(BaseModel):
-    name: str
-    brand: str | None = None
-    category: str | None = None
-    barcode: str | None = None
+    name: str = Field(min_length=1, max_length=200)
+    brand: str | None = Field(default=None, max_length=200)
+    category: str | None = Field(default=None, max_length=100)
+    barcode: str | None = Field(default=None, max_length=50)
     frozen_date: date
-    quantity: int = 1
-    containers: int = 1
-    shelf_life_days: int | None = None
+    quantity: int = Field(default=1, ge=1, le=999)
+    containers: int = Field(default=1, ge=1, le=50)
+    shelf_life_days: int | None = Field(default=None, ge=1, le=3650)
     freezer_id: str | None = None
-    notes: str | None = None
+    notes: str | None = Field(default=None, max_length=500)
     auto_print: bool = True
 
 
 class FoodItemUpdate(BaseModel):
-    name: str | None = None
-    brand: str | None = None
-    category: str | None = None
-    barcode: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    brand: str | None = Field(default=None, max_length=200)
+    category: str | None = Field(default=None, max_length=100)
+    barcode: str | None = Field(default=None, max_length=50)
     frozen_date: date | None = None
-    quantity: int | None = None
-    shelf_life_days: int | None = None
-    notes: str | None = None
+    quantity: int | None = Field(default=None, ge=1, le=999)
+    shelf_life_days: int | None = Field(default=None, ge=1, le=3650)
+    notes: str | None = Field(default=None, max_length=500)
 
 
 class FoodItemResponse(BaseModel):
@@ -82,9 +82,9 @@ class FoodItemResponse(BaseModel):
 
 
 class ShoppingItemCreate(BaseModel):
-    name: str
-    brand: str | None = None
-    quantity: int = 1
+    name: str = Field(min_length=1, max_length=200)
+    brand: str | None = Field(default=None, max_length=200)
+    quantity: int = Field(default=1, ge=1, le=999)
 
 
 class ShoppingItemResponse(BaseModel):

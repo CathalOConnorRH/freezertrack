@@ -53,68 +53,50 @@ def preview_sample(
     sample_qty: int = Query(default=2),
     sample_notes: str = Query(default="Spicy, double portion"),
 ):
-    orig_w = settings.LABEL_WIDTH
-    orig_h = settings.LABEL_HEIGHT
-    orig_fs = settings.LABEL_FONT_SIZE
-    orig_sb = settings.LABEL_SHOW_BRAND
-    orig_sn = settings.LABEL_SHOW_NOTES
-    orig_sc = settings.LABEL_SHOW_CATEGORY
+    sample_item = FoodItemResponse(
+        id="sample01-preview-label",
+        name=sample_name,
+        brand=sample_brand,
+        category=sample_category,
+        barcode=None,
+        frozen_date=date.today(),
+        quantity=sample_qty,
+        shelf_life_days=180,
+        notes=sample_notes,
+        photo_path=None,
+        freezer_id=None,
+        removed_at=None,
+        qr_code_id="sample01-preview-label",
+        created_at=date.today(),
+    )
 
-    try:
-        if width is not None:
-            settings.LABEL_WIDTH = width
-        if height is not None:
-            settings.LABEL_HEIGHT = height
-        if font_size is not None:
-            settings.LABEL_FONT_SIZE = font_size
-        if show_brand is not None:
-            settings.LABEL_SHOW_BRAND = show_brand
-        if show_notes is not None:
-            settings.LABEL_SHOW_NOTES = show_notes
-        if show_category is not None:
-            settings.LABEL_SHOW_CATEGORY = show_category
+    with tempfile.TemporaryDirectory() as tmpdir:
+        qr_path = os.path.join(tmpdir, "qr.png")
+        label_path = os.path.join(tmpdir, "label.png")
 
-        sample_item = FoodItemResponse(
-            id="sample01-preview-label",
-            name=sample_name,
-            brand=sample_brand,
-            category=sample_category,
-            barcode=None,
-            frozen_date=date.today(),
-            quantity=sample_qty,
-            shelf_life_days=180,
-            notes=sample_notes,
-            photo_path=None,
-            freezer_id=None,
-            removed_at=None,
-            qr_code_id="sample01-preview-label",
-            created_at=date.today(),
+        qr_data = {
+            "id": sample_item.id,
+            "name": sample_item.name,
+            "frozen": str(sample_item.frozen_date),
+            "qty": sample_item.quantity,
+        }
+        qr_service.generate_qr_png(qr_data, qr_path)
+        label_image.compose_label(
+            sample_item,
+            qr_path,
+            label_path,
+            width=width,
+            height=height,
+            font_size=font_size,
+            show_brand=show_brand,
+            show_notes=show_notes,
+            show_category=show_category,
         )
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            qr_path = os.path.join(tmpdir, "qr.png")
-            label_path = os.path.join(tmpdir, "label.png")
+        with open(label_path, "rb") as f:
+            content = f.read()
 
-            qr_data = {
-                "id": sample_item.id,
-                "name": sample_item.name,
-                "frozen": str(sample_item.frozen_date),
-                "qty": sample_item.quantity,
-            }
-            qr_service.generate_qr_png(qr_data, qr_path)
-            label_image.compose_label(sample_item, qr_path, label_path)
-
-            with open(label_path, "rb") as f:
-                content = f.read()
-
-        return StreamingResponse(io.BytesIO(content), media_type="image/png")
-    finally:
-        settings.LABEL_WIDTH = orig_w
-        settings.LABEL_HEIGHT = orig_h
-        settings.LABEL_FONT_SIZE = orig_fs
-        settings.LABEL_SHOW_BRAND = orig_sb
-        settings.LABEL_SHOW_NOTES = orig_sn
-        settings.LABEL_SHOW_CATEGORY = orig_sc
+    return StreamingResponse(io.BytesIO(content), media_type="image/png")
 
 
 @router.get("/printer/status")
