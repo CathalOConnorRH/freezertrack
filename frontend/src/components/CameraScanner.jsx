@@ -6,9 +6,12 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 
+const COOLDOWN_MS = 3000;
+
 export default function CameraScanner({ onScan }) {
   const videoRef = useRef(null);
   const readerRef = useRef(null);
+  const lastScanRef = useRef({ text: "", time: 0 });
   const [permState, setPermState] = useState("prompt");
   const [flash, setFlash] = useState(false);
 
@@ -25,10 +28,19 @@ export default function CameraScanner({ onScan }) {
     readerRef.current = reader;
     reader.decodeFromVideoDevice(undefined, videoRef.current, (result, err) => {
       if (result) {
+        const text = result.getText();
+        const now = Date.now();
+        if (
+          text === lastScanRef.current.text &&
+          now - lastScanRef.current.time < COOLDOWN_MS
+        ) {
+          return;
+        }
+        lastScanRef.current = { text, time: now };
         setFlash(true);
         setTimeout(() => {
           setFlash(false);
-          onScan(result.getText());
+          onScan(text);
         }, 200);
       }
     });
