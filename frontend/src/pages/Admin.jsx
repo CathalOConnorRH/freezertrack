@@ -14,6 +14,7 @@ const CONFIG_FIELDS = {
   NIIMBOT_MAC: { label: "Printer Bluetooth MAC", placeholder: "AA:BB:CC:DD:EE:FF" },
   AUTO_PRINT: { label: "Auto-print labels on add", type: "toggle" },
   UPC_ITEM_DB_KEY: { label: "UPC Item DB API Key", placeholder: "Optional" },
+  BARCODE_LOOKUP_API_KEY: { label: "Barcode Lookup API Key", placeholder: "Optional — barcodelookup.com" },
   BARCODE_CACHE_TTL_SECONDS: { label: "Barcode cache TTL (seconds)", type: "number" },
   ALERT_DAYS_FROZEN: { label: "Alert after days frozen", type: "number" },
   LOW_STOCK_THRESHOLD: { label: "Low stock alert threshold", type: "number" },
