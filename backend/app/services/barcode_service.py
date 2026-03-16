@@ -21,12 +21,12 @@ async def lookup_barcode(barcode: str, settings: Settings) -> dict:
         _mem_store(barcode, db_result)
         return db_result
 
-    result = await _try_open_food_facts(barcode)
+    result = await _try_upc_item_db(barcode, settings.UPC_ITEM_DB_KEY)
     if result:
         _store(barcode, result)
         return result
 
-    result = await _try_upc_item_db(barcode, settings.UPC_ITEM_DB_KEY)
+    result = await _try_open_food_facts(barcode)
     if result:
         _store(barcode, result)
         return result
