@@ -26,7 +26,12 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
 ]
 
-SCAN_BARCODE_SCHEMA = vol.Schema({vol.Required("barcode"): cv.string})
+SCAN_BARCODE_SCHEMA = vol.Schema(
+    vol.Any(
+        {vol.Required("barcode"): cv.string},
+        {vol.Required("input_entity"): cv.entity_id},
+    )
+)
 ADD_ITEM_SCHEMA = vol.Schema({
     vol.Required("name"): cv.string,
     vol.Optional("barcode"): cv.string,
@@ -103,7 +108,15 @@ def _register_services(
         return
 
     async def handle_scan_barcode(call: ServiceCall) -> None:
-        barcode = call.data["barcode"]
+        barcode = call.data.get("barcode")
+        if not barcode:
+            entity_id = call.data.get("input_entity")
+            if entity_id:
+                state = hass.states.get(entity_id)
+                barcode = state.state if state and state.state not in ("", "unknown", "unavailable") else None
+        if not barcode:
+            LOGGER.warning("No barcode provided")
+            return
         mode = coordinator.data.get("scanner_mode", "out") if coordinator.data else "out"
 
         try:

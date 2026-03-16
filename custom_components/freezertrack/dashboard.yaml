@@ -81,7 +81,7 @@ views:
               action: call-service
               service: freezertrack.scan_barcode
               data:
-                barcode: "{{ states('input_text.freezertrack_barcode') }}"
+                input_entity: input_text.freezertrack_barcode
             hold_action:
               action: none
           - type: button

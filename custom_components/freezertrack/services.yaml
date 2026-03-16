@@ -3,14 +3,19 @@ scan_barcode:
   description: >-
     Process a barcode using the current scanner mode. In "Scan In" mode the
     barcode is looked up and a new item is created. In "Scan Out" mode the
-    matching item is removed.
+    matching item is removed. Provide either barcode or input_entity.
   fields:
     barcode:
       name: Barcode
       description: The retail barcode string to scan.
-      required: true
       selector:
         text:
+    input_entity:
+      name: Input entity
+      description: An input_text entity to read the barcode from (for dashboard buttons).
+      selector:
+        entity:
+          domain: input_text
 
 add_item:
   name: Add item
