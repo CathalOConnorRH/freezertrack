@@ -57,6 +57,7 @@ export default function Inventory() {
     setEditForm({
       name: item.name || "",
       brand: item.brand || "",
+      barcode: item.barcode || "",
       category: item.category || "",
       quantity: item.quantity,
       frozen_date: item.frozen_date,
@@ -78,6 +79,7 @@ export default function Inventory() {
       if (!orig) return;
       if (editForm.name !== (orig.name || "")) changes.name = editForm.name;
       if (editForm.brand !== (orig.brand || "")) changes.brand = editForm.brand || null;
+      if (editForm.barcode !== (orig.barcode || "")) changes.barcode = editForm.barcode || null;
       if (editForm.category !== (orig.category || "")) changes.category = editForm.category || null;
       if (editForm.quantity !== orig.quantity) changes.quantity = parseInt(editForm.quantity, 10);
       if (editForm.frozen_date !== orig.frozen_date) changes.frozen_date = editForm.frozen_date;
@@ -395,6 +397,17 @@ export default function Inventory() {
                           />
                         </div>
                         <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">Barcode</label>
+                          <input
+                            type="text"
+                            value={editForm.barcode}
+                            onChange={(e) => setEditForm({ ...editForm, barcode: e.target.value })}
+                            placeholder="Retail barcode"
+                            inputMode="numeric"
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
+                          />
+                        </div>
+                        <div>
                           <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
                           <select
                             value={editForm.category}
@@ -461,6 +474,7 @@ export default function Inventory() {
                           <p className="text-xs text-gray-500">
                             {item.frozen_date} &middot; x{item.quantity}
                             {item.category && <> &middot; {item.category}</>}
+                            {item.barcode && <> &middot; <span className="text-gray-400">{item.barcode}</span></>}
                           </p>
                         </div>
                         <button

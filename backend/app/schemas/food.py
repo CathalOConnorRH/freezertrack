@@ -36,6 +36,7 @@ class FoodItemUpdate(BaseModel):
     name: str | None = None
     brand: str | None = None
     category: str | None = None
+    barcode: str | None = None
     frozen_date: date | None = None
     quantity: int | None = None
     shelf_life_days: int | None = None
