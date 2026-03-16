@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import voluptuous as vol
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall, SupportsResponse
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.loader import async_get_loaded_integration
@@ -84,6 +84,15 @@ async def _async_reload_entry(
     await hass.config_entries.async_reload(entry.entry_id)
 
 
+async def _notify(hass: HomeAssistant, message: str) -> None:
+    """Create a persistent notification via service call."""
+    await hass.services.async_call(
+        "persistent_notification",
+        "create",
+        {"message": message, "title": "FreezerTrack Scan"},
+    )
+
+
 def _register_services(
     hass: HomeAssistant,
     client: FreezerTrackApiClient,
@@ -119,9 +128,7 @@ def _register_services(
                 if not items:
                     msg = f"No items found for barcode {barcode}"
                     LOGGER.warning(msg)
-                    hass.components.persistent_notification.async_create(
-                        msg, title="FreezerTrack Scan"
-                    )
+                    await _notify(hass, msg)
                     return
 
                 oldest = min(items, key=lambda i: i.get("frozen_date", ""))
@@ -129,15 +136,11 @@ def _register_services(
                 msg = f"Scanned out: {oldest['name']}"
 
             LOGGER.info(msg)
-            hass.components.persistent_notification.async_create(
-                msg, title="FreezerTrack Scan"
-            )
+            await _notify(hass, msg)
             await coordinator.async_request_refresh()
         except FreezerTrackApiError as exc:
             LOGGER.error("Scan barcode failed: %s", exc)
-            hass.components.persistent_notification.async_create(
-                f"Scan failed: {exc}", title="FreezerTrack Scan"
-            )
+            await _notify(hass, f"Scan failed: {exc}")
 
     async def handle_add_item(call: ServiceCall) -> None:
         try:
