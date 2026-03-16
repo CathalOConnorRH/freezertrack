@@ -45,12 +45,7 @@ views:
             state: "on"
         card:
           type: markdown
-          content: >-
-            ## ⚠️ Low Stock
-
-            You have **{{ state_attr('binary_sensor.freezertrack_low_stock',
-            'current_count') }}** items — below the threshold of
-            {{ state_attr('binary_sensor.freezertrack_low_stock', 'threshold') }}.
+          content: "## ⚠️ Low Stock\nYou have **{{ state_attr('binary_sensor.freezertrack_low_stock', 'current_count') }}** items — below the threshold of {{ state_attr('binary_sensor.freezertrack_low_stock', 'threshold') }}."
 
       - type: conditional
         conditions:
@@ -59,15 +54,14 @@ views:
             state: "on"
         card:
           type: markdown
-          content: >-
+          content: |-
             ## ⏰ Old Items
-
-            {% set items = state_attr('binary_sensor.freezertrack_old_items', 'items') %}
-            {% if items %}
-            {% for item in items %}
+            {%- set items = state_attr('binary_sensor.freezertrack_old_items', 'items') %}
+            {%- if items %}
+            {%- for item in items %}
             - **{{ item.name }}** — {{ item.days_frozen }} days
-            {% endfor %}
-            {% endif %}
+            {%- endfor %}
+            {%- endif %}
 
       # ── Scanner ───────────────────────────────────────────────────────
       - type: entities
@@ -105,27 +99,27 @@ views:
       # ── Categories ────────────────────────────────────────────────────
       - type: markdown
         title: Categories
-        content: >-
-          {% set cats = state_attr('sensor.freezertrack_categories', 'category_list') %}
-          {% if cats %}
-          {% for cat in cats %}
+        content: |-
+          {%- set cats = state_attr('sensor.freezertrack_categories', 'category_list') %}
+          {%- if cats %}
+          {%- for cat in cats %}
           `{{ cat }}`{% if not loop.last %} · {% endif %}
-          {% endfor %}
-          {% else %}
+          {%- endfor %}
+          {%- else %}
           No categories yet.
-          {% endif %}
+          {%- endif %}
 
       # ── Items list ────────────────────────────────────────────────────
       - type: markdown
         title: Freezer Contents
-        content: >-
-          {% set items = state_attr('sensor.freezertrack_total_items', 'items') %}
-          {% if items and items | length > 0 %}
+        content: |-
+          {%- set items = state_attr('sensor.freezertrack_total_items', 'items') %}
+          {%- if items and items | length > 0 %}
           | Item | Qty | Frozen | Days |
           |------|-----|--------|------|
-          {% for item in items | sort(attribute='days_frozen', reverse=true) %}
+          {%- for item in items | sort(attribute='days_frozen', reverse=true) %}
           | {{ item.name }} | {{ item.quantity }} | {{ item.frozen_date }} | {{ item.days_frozen }}d |
-          {% endfor %}
-          {% else %}
+          {%- endfor %}
+          {%- else %}
           Your freezer is empty.
-          {% endif %}
+          {%- endif %}
