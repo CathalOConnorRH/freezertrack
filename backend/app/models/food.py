@@ -33,6 +33,7 @@ class FoodItem(Base):
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     shelf_life_days: Mapped[int | None] = mapped_column(Integer, nullable=True)
     notes: Mapped[str | None] = mapped_column(String, nullable=True)
+    barcode: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     photo_path: Mapped[str | None] = mapped_column(String, nullable=True)
     freezer_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("freezers.id"), nullable=True

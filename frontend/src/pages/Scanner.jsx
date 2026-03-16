@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { removeItem, decrementItem, lookupBarcode, searchItems, getScannerMode, setScannerMode } from "../api/client";
+import { removeItem, decrementItem, lookupBarcode, searchItems, getItemsByBarcode, getScannerMode, setScannerMode } from "../api/client";
 import ScanInput from "../components/ScanInput";
 import CameraScanner from "../components/CameraScanner";
 import { LogIn, LogOut, X } from "lucide-react";
@@ -78,6 +78,17 @@ export default function Scanner() {
 
   const handleScanOut = async (barcode) => {
     try {
+      // Try direct barcode lookup first (items that stored this barcode)
+      const byBarcode = await getItemsByBarcode(barcode);
+      if (byBarcode.length === 1) {
+        await doRemove(byBarcode[0]);
+        return;
+      } else if (byBarcode.length > 1) {
+        setMatches(byBarcode);
+        return;
+      }
+
+      // Fall back to name-based search via barcode cache
       const data = await lookupBarcode(barcode);
       const searchName = data.found ? data.name : barcode;
 

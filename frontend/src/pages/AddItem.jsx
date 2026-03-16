@@ -112,6 +112,7 @@ export default function AddItem() {
         name: form.name,
         brand: form.brand || null,
         category: form.category || null,
+        barcode: form.barcode || null,
         frozen_date: form.frozen_date,
         quantity: Number(form.quantity),
         containers: Number(form.containers),

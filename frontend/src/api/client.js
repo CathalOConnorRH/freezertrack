@@ -25,6 +25,8 @@ export const printLabel = (id) =>
   api.post(`/labels/${id}/print`).then((r) => r.data);
 export const searchItems = (q) =>
   api.get("/food/search", { params: { q } }).then((r) => r.data);
+export const getItemsByBarcode = (barcode) =>
+  api.get(`/food/by-barcode/${barcode}`).then((r) => r.data);
 export const saveBarcodeMapping = (barcode, name, brand) =>
   api.post("/food/barcode", { barcode, name, brand }).then((r) => r.data);
 export const uploadPhoto = (id, file) => {

@@ -91,8 +91,16 @@ server {
         proxy_set_header Host $host;
     }
 
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
     location / {
         try_files $uri /index.html;
+        add_header Cache-Control "no-store, no-cache, must-revalidate";
+        add_header Pragma "no-cache";
+        etag off;
     }
 }
 NGINX

@@ -22,6 +22,7 @@ class FoodItemCreate(BaseModel):
     name: str
     brand: str | None = None
     category: str | None = None
+    barcode: str | None = None
     frozen_date: date
     quantity: int = 1
     containers: int = 1
@@ -48,6 +49,7 @@ class FoodItemResponse(BaseModel):
     name: str
     brand: str | None
     category: str | None
+    barcode: str | None
     frozen_date: date
     quantity: int
     shelf_life_days: int | None

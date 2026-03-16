@@ -79,6 +79,7 @@ def preview_sample(
             name=sample_name,
             brand=sample_brand,
             category=sample_category,
+            barcode=None,
             frozen_date=date.today(),
             quantity=sample_qty,
             shelf_life_days=180,

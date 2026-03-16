@@ -226,16 +226,22 @@ def handle_scan_out(barcode: str, api_url: str, client: httpx.Client) -> tuple[b
 
     log.info(f"Looking up barcode: {barcode}")
     try:
-        lookup = client.get(f"{base}/api/food/lookup/{barcode}")
-        lookup_data = lookup.json()
-        search_name = lookup_data.get("name", barcode) if lookup_data.get("found") else barcode
+        # Try direct barcode lookup first (items that stored this barcode)
+        by_barcode = client.get(f"{base}/api/food/by-barcode/{barcode}")
+        items = by_barcode.json() if by_barcode.status_code == 200 else []
 
-        search = client.get(f"{base}/api/food/search", params={"q": search_name})
-        items = search.json()
+        # Fall back to name-based search via barcode cache
+        if not items:
+            lookup = client.get(f"{base}/api/food/lookup/{barcode}")
+            lookup_data = lookup.json()
+            search_name = lookup_data.get("name", barcode) if lookup_data.get("found") else barcode
+
+            search = client.get(f"{base}/api/food/search", params={"q": search_name})
+            items = search.json()
 
         if not items:
-            log.warning(f"NOT FOUND in freezer: {search_name}")
-            return False, search_name
+            log.warning(f"NOT FOUND in freezer: {barcode}")
+            return False, barcode
 
         oldest = min(items, key=lambda i: i["frozen_date"])
         resp = client.post(f"{base}/api/food/{oldest['id']}/remove")
@@ -318,6 +324,7 @@ def handle_scan_in(barcode: str, api_url: str, client: httpx.Client) -> tuple[bo
             "name": name,
             "brand": brand,
             "category": category,
+            "barcode": barcode,
             "frozen_date": str(date.today()),
             "quantity": 1,
             "containers": 1,

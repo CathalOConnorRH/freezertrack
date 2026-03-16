@@ -114,6 +114,17 @@ def search_items(q: str, db: Session = Depends(get_db)):
     )
 
 
+@router.get("/by-barcode/{barcode}", response_model=list[FoodItemResponse])
+def get_items_by_barcode(barcode: str, db: Session = Depends(get_db)):
+    """Find active food items that were created from this retail barcode."""
+    return (
+        db.query(FoodItem)
+        .filter(FoodItem.barcode == barcode, FoodItem.removed_at.is_(None))
+        .order_by(FoodItem.frozen_date)
+        .all()
+    )
+
+
 @router.get("/lookup/{barcode}")
 async def lookup_barcode_endpoint(barcode: str):
     return await barcode_service.lookup_barcode(barcode, settings)
@@ -227,6 +238,7 @@ def create_item(payload: FoodItemCreate, db: Session = Depends(get_db)):
             name=payload.name,
             brand=payload.brand,
             category=payload.category,
+            barcode=payload.barcode,
             frozen_date=payload.frozen_date,
             quantity=payload.quantity,
             shelf_life_days=shelf_life,
@@ -364,6 +376,7 @@ def readd_item(item_id: str, db: Session = Depends(get_db)):
         name=source.name,
         brand=source.brand,
         category=source.category,
+        barcode=source.barcode,
         frozen_date=date.today(),
         quantity=source.quantity,
         shelf_life_days=source.shelf_life_days,
