@@ -91,7 +91,7 @@ def _save_to_db(barcode: str, result: dict) -> None:
 async def _try_open_food_facts(barcode: str) -> dict | None:
     url = f"https://world.openfoodfacts.org/api/v2/product/{barcode}.json"
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.get(url)
             if resp.status_code == 200:
                 data = resp.json()
@@ -107,7 +107,7 @@ async def _try_open_food_facts(barcode: str) -> dict | None:
                         "source": "open_food_facts",
                         "found": True,
                     }
-    except httpx.HTTPError:
+    except (httpx.HTTPError, TimeoutError):
         pass
     return None
 
@@ -115,7 +115,7 @@ async def _try_open_food_facts(barcode: str) -> dict | None:
 async def _try_upc_item_db(barcode: str) -> dict | None:
     url = f"https://api.upcitemdb.com/prod/trial/lookup?upc={barcode}"
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             resp = await client.get(url, headers={"Accept": "application/json"})
             if resp.status_code == 200:
                 data = resp.json()
@@ -127,7 +127,7 @@ async def _try_upc_item_db(barcode: str) -> dict | None:
                         "source": "upc_item_db",
                         "found": True,
                     }
-    except httpx.HTTPError:
+    except (httpx.HTTPError, TimeoutError):
         pass
     return None
 
