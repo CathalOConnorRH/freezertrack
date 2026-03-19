@@ -307,6 +307,42 @@ def update_status(_: None = Depends(_verify_admin)):
     return _update_state
 
 
+@router.post("/purge-history", status_code=200)
+def purge_history(db: Session = Depends(get_db), _: None = Depends(_verify_admin)):
+    """Hard-delete all food items that have been soft-deleted (removed_at IS NOT NULL)."""
+    count = db.query(FoodItem).filter(FoodItem.removed_at.isnot(None)).delete()
+    db.commit()
+    return {"deleted": count}
+
+
+@router.post("/purge-all-items", status_code=200)
+def purge_all_items(db: Session = Depends(get_db), _: None = Depends(_verify_admin)):
+    """Hard-delete every food item (active + history)."""
+    count = db.query(FoodItem).delete()
+    db.commit()
+    return {"deleted": count}
+
+
+@router.post("/purge-barcode-cache", status_code=200)
+def purge_barcode_cache(db: Session = Depends(get_db), _: None = Depends(_verify_admin)):
+    """Clear the barcode lookup cache."""
+    from app.models.food import BarcodeCache
+
+    count = db.query(BarcodeCache).delete()
+    db.commit()
+    return {"deleted": count}
+
+
+@router.post("/purge-shopping", status_code=200)
+def purge_shopping(db: Session = Depends(get_db), _: None = Depends(_verify_admin)):
+    """Delete all shopping list items (active + completed)."""
+    from app.models.food import ShoppingItem
+
+    count = db.query(ShoppingItem).delete()
+    db.commit()
+    return {"deleted": count}
+
+
 @router.post("/restart")
 def restart_service(_: None = Depends(_verify_admin)):
     try:

@@ -74,3 +74,12 @@ export const restoreBackup = (file) => {
   form.append("file", file);
   return api.post("/admin/restore?confirm=true", form).then((r) => r.data);
 };
+
+export const purgeHistory = () =>
+  api.post("/admin/purge-history").then((r) => r.data);
+export const purgeAllItems = () =>
+  api.post("/admin/purge-all-items").then((r) => r.data);
+export const purgeBarcodeCache = () =>
+  api.post("/admin/purge-barcode-cache").then((r) => r.data);
+export const purgeShopping = () =>
+  api.post("/admin/purge-shopping").then((r) => r.data);
