@@ -2,14 +2,14 @@ import logging
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.config import settings
-from app.database import Base, SessionLocal, engine
+from app.database import Base, engine, get_db
 from app.routers import admin, food, freezers, homeassistant, labels, scanner, shopping
 
 logger = logging.getLogger("freezertrack")
@@ -82,15 +82,11 @@ app.include_router(scanner.router)
 
 
 @app.get("/health")
-def health():
+def health(db=Depends(get_db)):
     db_ok = False
     try:
-        db = SessionLocal()
-        try:
-            db.execute(text("SELECT 1"))
-            db_ok = True
-        finally:
-            db.close()
+        db.execute(text("SELECT 1"))
+        db_ok = True
     except Exception:
         pass
 

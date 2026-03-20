@@ -18,6 +18,7 @@ from app.schemas.food import (
     FoodItemResponse,
     FoodItemUpdate,
 )
+from app.routers.scanner import record_last_scan
 from app.services import barcode_service, label_image, print_service, qr_service
 
 router = APIRouter(prefix="/api/food", tags=["food"])
@@ -273,6 +274,13 @@ def create_item(payload: FoodItemCreate, db: Session = Depends(get_db)):
 
         created_items.append(FoodItemResponse.model_validate(item).model_dump(mode="json"))
 
+    if created_items:
+        record_last_scan(
+            name=created_items[0].get("name", ""),
+            barcode=payload.barcode,
+            action="in",
+        )
+
     return {
         "items": created_items,
         "count": len(created_items),
@@ -342,6 +350,7 @@ def remove_item(item_id: str, db: Session = Depends(get_db)):
             db.add(shopping)
             db.commit()
 
+    record_last_scan(name=item.name, barcode=item.barcode, action="out")
     return item
 
 

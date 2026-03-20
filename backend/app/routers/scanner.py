@@ -11,6 +11,22 @@ _scanner_state = {
     "mode": "out",
 }
 
+_last_scan = {
+    "name": None,
+    "barcode": None,
+    "action": None,
+    "timestamp": None,
+}
+
+
+def record_last_scan(name: str, barcode: str | None, action: str) -> None:
+    """Called by the food router after a scan-in or scan-out to record the result."""
+    from datetime import datetime, timezone
+    _last_scan["name"] = name
+    _last_scan["barcode"] = barcode
+    _last_scan["action"] = action
+    _last_scan["timestamp"] = datetime.now(timezone.utc).isoformat()
+
 CATEGORY_KEYWORDS = {
     "Meat": ["mince", "beef", "steak", "lamb", "pork", "bacon", "ham", "sausage",
              "burger", "angus", "sirloin", "chuck"],
@@ -54,6 +70,11 @@ def set_scanner_mode(payload: ScannerModeUpdate):
         raise HTTPException(status_code=400, detail="mode must be 'in' or 'out'")
     _scanner_state["mode"] = payload.mode
     return _scanner_state
+
+
+@router.get("/last")
+def get_last_scan():
+    return _last_scan
 
 
 @router.post("/auto-categorise")
