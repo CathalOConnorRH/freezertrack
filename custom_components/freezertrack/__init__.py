@@ -24,6 +24,7 @@ PLATFORMS: list[Platform] = [
     Platform.SENSOR,
     Platform.BINARY_SENSOR,
     Platform.SELECT,
+    Platform.TODO,
 ]
 
 SCAN_BARCODE_SCHEMA = vol.Schema(
