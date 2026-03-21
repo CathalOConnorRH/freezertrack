@@ -61,21 +61,11 @@ class FreezerTrackTodoList(FreezerTrackEntity, TodoListEntity):
         return [
             TodoItem(
                 uid=item["id"],
-                summary=self._format_summary(item),
+                summary=item.get("name", "Unknown"),
                 status=TodoItemStatus.NEEDS_ACTION,
             )
             for item in items
         ]
-
-    def _format_summary(self, item: dict) -> str:
-        name = item.get("name", "Unknown")
-        qty = item.get("quantity", 1)
-        days = item.get("days_frozen", 0)
-        parts = [name]
-        if qty > 1:
-            parts.append(f"x{qty}")
-        parts.append(f"({days}d)")
-        return " ".join(parts)
 
     async def async_create_todo_item(self, item: TodoItem) -> None:
         """Add a new item to the freezer."""
