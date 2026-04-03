@@ -12,7 +12,7 @@ import {
 import AlertBanner from "../components/AlertBanner";
 import ErrorBanner from "../components/ErrorBanner";
 import { useNavigate } from "react-router-dom";
-import { LogIn, LogOut, Pencil, Check, X, Trash2, Minus } from "lucide-react";
+import { LogIn, LogOut, Pencil, Check, X, Trash2, Minus, ChevronDown, ChevronUp } from "lucide-react";
 
 const PRESET_CATEGORIES = [
   "Meat", "Poultry", "Fish", "Vegetables", "Fruit",
@@ -47,6 +47,7 @@ export default function Dashboard() {
   const [editForm, setEditForm] = useState({});
   const [acting, setActing] = useState(false);
   const [actionMsg, setActionMsg] = useState(null);
+  const [expandedGroups, setExpandedGroups] = useState(new Set());
   const navigate = useNavigate();
   const intervalRef = useRef(null);
 
@@ -166,10 +167,18 @@ export default function Dashboard() {
   }).length;
   const needsAttention =
     haState?.alerts?.filter((a) => a.type === "old_item").length || 0;
-  const sorted = [...items].sort(
-    (a, b) => new Date(b.created_at) - new Date(a.created_at)
-  );
   const allCategories = [...new Set([...PRESET_CATEGORIES, ...categories])];
+
+  const groups = buildGroups(items);
+
+  const toggleGroup = (key) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) { next.delete(key); cancelEdit(); }
+      else next.add(key);
+      return next;
+    });
+  };
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -226,166 +235,136 @@ export default function Dashboard() {
       <h3 className="text-base sm:text-lg font-semibold mb-3">All Items</h3>
 
       <div className="space-y-2">
-        {sorted.map((item) => {
-          const badge = ageBadge(item.frozen_date);
-          const isEditing = editingId === item.id;
-
-          if (isEditing) {
-            return (
-              <div
-                key={item.id}
-                className="bg-[var(--surface)] rounded-xl border-2 border-[var(--ice-blue)] p-4"
-              >
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Name</label>
-                      <input
-                        type="text"
-                        value={editForm.name}
-                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Brand</label>
-                      <input
-                        type="text"
-                        value={editForm.brand}
-                        onChange={(e) => setEditForm({ ...editForm, brand: e.target.value })}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Category</label>
-                      <select
-                        value={editForm.category}
-                        onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-[var(--surface)] focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
-                      >
-                        <option value="">None</option>
-                        {allCategories.map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Quantity</label>
-                      <input
-                        type="number"
-                        min="1"
-                        value={editForm.quantity}
-                        onChange={(e) => setEditForm({ ...editForm, quantity: parseInt(e.target.value, 10) || 1 })}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Frozen date</label>
-                      <input
-                        type="date"
-                        value={editForm.frozen_date}
-                        onChange={(e) => setEditForm({ ...editForm, frozen_date: e.target.value })}
-                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Notes</label>
-                    <input
-                      type="text"
-                      value={editForm.notes}
-                      onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                      placeholder="Optional notes..."
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
-                    />
-                  </div>
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <button
-                      onClick={saveEdit}
-                      disabled={acting}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-[var(--ice-blue)] text-white rounded-lg text-sm font-medium hover:bg-[#4a9bd9] active:scale-[0.98] disabled:opacity-50"
-                    >
-                      <Check size={14} /> Save
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 active:scale-[0.98]"
-                    >
-                      <X size={14} /> Cancel
-                    </button>
-                    {item.quantity > 1 && (
-                      <button
-                        onClick={() => handleDecrement(item)}
-                        disabled={acting}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-100 active:scale-[0.98] disabled:opacity-50 ml-auto"
-                      >
-                        <Minus size={14} /> Use 1
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleRemove(item)}
-                      disabled={acting}
-                      className={`flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 active:scale-[0.98] disabled:opacity-50 ${item.quantity <= 1 ? "ml-auto" : ""}`}
-                    >
-                      <Trash2 size={14} /> Remove
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          }
+        {groups.map((group) => {
+          const badge = ageBadge(group.oldestDate);
+          const isMulti = group.items.length > 1;
+          const isExpanded = expandedGroups.has(group.key);
 
           return (
             <div
-              key={item.id}
-              className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-3.5 sm:p-4 hover:shadow-sm transition-shadow"
+              key={group.key}
+              className="bg-[var(--surface)] rounded-xl border border-[var(--border)] overflow-hidden hover:shadow-sm transition-shadow"
             >
-              <div className="flex items-center gap-3">
+              {/* Group summary row */}
+              <div
+                className={`flex items-center gap-3 p-3.5 sm:p-4 ${isMulti ? "cursor-pointer" : ""}`}
+                onClick={isMulti ? () => toggleGroup(group.key) : undefined}
+              >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-semibold text-gray-900 text-[15px] sm:text-base">
-                      {item.name}
+                      {group.name}
                     </h3>
-                    {item.brand && (
-                      <span className="text-xs text-gray-400">{item.brand}</span>
+                    {group.brand && (
+                      <span className="text-xs text-gray-400">{group.brand}</span>
                     )}
                   </div>
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span className="text-xs sm:text-sm text-gray-500">
-                      Frozen {daysAgo(item.frozen_date)}
+                      {isMulti
+                        ? `${group.items.length} containers · oldest ${daysAgo(group.oldestDate)}`
+                        : `Frozen ${daysAgo(group.oldestDate)}`}
                     </span>
-                    {item.category && (
+                    {group.category && (
                       <span className="text-[11px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">
-                        {item.category}
-                      </span>
-                    )}
-                    {item.notes && (
-                      <span className="text-[11px] text-gray-400 italic truncate max-w-[200px]">
-                        {item.notes}
+                        {group.category}
                       </span>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                  <span className="bg-gray-100 text-gray-600 text-[11px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded-full">
-                    x{item.quantity}
+                  <span className="bg-[var(--ice-blue)]/10 text-[var(--ice-blue)] text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full">
+                    x{group.totalQty}
                   </span>
                   <span
                     className={`text-[11px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded-full ${badge.cls}`}
                   >
                     {badge.label}
                   </span>
-                  <button
-                    onClick={() => startEdit(item)}
-                    className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
-                    title="Edit item"
-                  >
-                    <Pencil size={15} />
-                  </button>
+                  {isMulti ? (
+                    <span className="p-1.5 text-gray-400">
+                      {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => startEdit(group.items[0])}
+                      className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                      title="Edit item"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {/* Expanded: individual items within the group */}
+              {isMulti && isExpanded && (
+                <div className="border-t border-[var(--border)] divide-y divide-[var(--border)]">
+                  {group.items.map((item) => {
+                    const itemBadge = ageBadge(item.frozen_date);
+                    if (editingId === item.id) {
+                      return (
+                        <div key={item.id} className="p-4 bg-[var(--ice-blue)]/5">
+                          <EditForm
+                            editForm={editForm}
+                            setEditForm={setEditForm}
+                            allCategories={allCategories}
+                            onSave={saveEdit}
+                            onCancel={cancelEdit}
+                            onDecrement={() => handleDecrement(item)}
+                            onRemove={() => handleRemove(item)}
+                            acting={acting}
+                            showDecrement={item.quantity > 1}
+                          />
+                        </div>
+                      );
+                    }
+                    return (
+                      <div key={item.id} className="flex items-center gap-3 px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Frozen {daysAgo(item.frozen_date)}
+                            {item.notes && <span className="italic text-gray-400 ml-2">{item.notes}</span>}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                          <span className="bg-gray-100 text-gray-600 text-[11px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded-full">
+                            x{item.quantity}
+                          </span>
+                          <span className={`text-[11px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded-full ${itemBadge.cls}`}>
+                            {itemBadge.label}
+                          </span>
+                          <button
+                            onClick={() => startEdit(item)}
+                            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                            title="Edit item"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Single-item inline edit */}
+              {!isMulti && editingId === group.items[0].id && (
+                <div className="border-t border-[var(--ice-blue)] p-4 bg-[var(--ice-blue)]/5">
+                  <EditForm
+                    editForm={editForm}
+                    setEditForm={setEditForm}
+                    allCategories={allCategories}
+                    onSave={saveEdit}
+                    onCancel={cancelEdit}
+                    onDecrement={() => handleDecrement(group.items[0])}
+                    onRemove={() => handleRemove(group.items[0])}
+                    acting={acting}
+                    showDecrement={group.items[0].quantity > 1}
+                  />
+                </div>
+              )}
             </div>
           );
         })}
@@ -399,6 +378,138 @@ export default function Dashboard() {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function buildGroups(items) {
+  const map = new Map();
+  for (const item of items) {
+    const key = item.barcode || `_solo_${item.id}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        name: item.name,
+        brand: item.brand,
+        category: item.category,
+        oldestDate: item.frozen_date,
+        newestCreated: item.created_at,
+        totalQty: 0,
+        items: [],
+      });
+    }
+    const g = map.get(key);
+    g.totalQty += item.quantity;
+    if (item.frozen_date < g.oldestDate) g.oldestDate = item.frozen_date;
+    if (item.created_at > g.newestCreated) g.newestCreated = item.created_at;
+    g.items.push(item);
+  }
+  const groups = [...map.values()];
+  groups.sort((a, b) => new Date(b.newestCreated) - new Date(a.newestCreated));
+  for (const g of groups) {
+    g.items.sort((a, b) => new Date(a.frozen_date) - new Date(b.frozen_date));
+  }
+  return groups;
+}
+
+function EditForm({ editForm, setEditForm, allCategories, onSave, onCancel, onDecrement, onRemove, acting, showDecrement }) {
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Name</label>
+          <input
+            type="text"
+            value={editForm.name}
+            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Brand</label>
+          <input
+            type="text"
+            value={editForm.brand}
+            onChange={(e) => setEditForm({ ...editForm, brand: e.target.value })}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Category</label>
+          <select
+            value={editForm.category}
+            onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-[var(--surface)] focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
+          >
+            <option value="">None</option>
+            {allCategories.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Quantity</label>
+          <input
+            type="number"
+            min="1"
+            value={editForm.quantity}
+            onChange={(e) => setEditForm({ ...editForm, quantity: parseInt(e.target.value, 10) || 1 })}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Frozen date</label>
+          <input
+            type="date"
+            value={editForm.frozen_date}
+            onChange={(e) => setEditForm({ ...editForm, frozen_date: e.target.value })}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Notes</label>
+        <input
+          type="text"
+          value={editForm.notes}
+          onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+          placeholder="Optional notes..."
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
+        />
+      </div>
+      <div className="flex flex-wrap gap-2 pt-1">
+        <button
+          onClick={onSave}
+          disabled={acting}
+          className="flex items-center gap-1.5 px-4 py-2 bg-[var(--ice-blue)] text-white rounded-lg text-sm font-medium hover:bg-[#4a9bd9] active:scale-[0.98] disabled:opacity-50"
+        >
+          <Check size={14} /> Save
+        </button>
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-1.5 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 active:scale-[0.98]"
+        >
+          <X size={14} /> Cancel
+        </button>
+        {showDecrement && (
+          <button
+            onClick={onDecrement}
+            disabled={acting}
+            className="flex items-center gap-1.5 px-4 py-2 bg-amber-50 text-amber-700 rounded-lg text-sm font-medium hover:bg-amber-100 active:scale-[0.98] disabled:opacity-50 ml-auto"
+          >
+            <Minus size={14} /> Use 1
+          </button>
+        )}
+        <button
+          onClick={onRemove}
+          disabled={acting}
+          className={`flex items-center gap-1.5 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 active:scale-[0.98] disabled:opacity-50 ${!showDecrement ? "ml-auto" : ""}`}
+        >
+          <Trash2 size={14} /> Remove
+        </button>
+      </div>
     </div>
   );
 }
