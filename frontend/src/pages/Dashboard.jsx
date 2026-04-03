@@ -29,13 +29,6 @@ function daysAgo(dateStr) {
   return `${Math.floor(days / 30)} months ago`;
 }
 
-function ageBadge(dateStr) {
-  const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
-  if (days < 30) return { label: "Fresh", cls: "bg-green-100 text-green-700" };
-  if (days < 90) return { label: "Aging", cls: "bg-amber-100 text-amber-700" };
-  return { label: "Old", cls: "bg-red-100 text-red-700" };
-}
-
 export default function Dashboard() {
   const [items, setItems] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -236,7 +229,6 @@ export default function Dashboard() {
 
       <div className="space-y-2">
         {groups.map((group) => {
-          const badge = ageBadge(group.oldestDate);
           const isMulti = group.items.length > 1;
           const isExpanded = expandedGroups.has(group.key);
 
@@ -273,13 +265,8 @@ export default function Dashboard() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                  <span className="bg-[var(--ice-blue)]/10 text-[var(--ice-blue)] text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full">
+                  <span className="bg-[var(--ice-blue)]/10 text-[var(--ice-blue)] text-sm sm:text-base font-bold px-2.5 py-1 rounded-full">
                     x{group.totalQty}
-                  </span>
-                  <span
-                    className={`text-[11px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded-full ${badge.cls}`}
-                  >
-                    {badge.label}
                   </span>
                   {isMulti ? (
                     <span className="p-1.5 text-gray-400">
@@ -301,7 +288,6 @@ export default function Dashboard() {
               {isMulti && isExpanded && (
                 <div className="border-t border-[var(--border)] divide-y divide-[var(--border)]">
                   {group.items.map((item) => {
-                    const itemBadge = ageBadge(item.frozen_date);
                     if (editingId === item.id) {
                       return (
                         <div key={item.id} className="p-4 bg-[var(--ice-blue)]/5">
@@ -329,11 +315,8 @@ export default function Dashboard() {
                           </p>
                         </div>
                         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                          <span className="bg-gray-100 text-gray-600 text-[11px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded-full">
+                          <span className="bg-gray-100 text-gray-600 text-sm sm:text-base font-bold px-2.5 py-1 rounded-full">
                             x{item.quantity}
-                          </span>
-                          <span className={`text-[11px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded-full ${itemBadge.cls}`}>
-                            {itemBadge.label}
                           </span>
                           <button
                             onClick={() => startEdit(item)}
