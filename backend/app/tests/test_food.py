@@ -1,5 +1,7 @@
 from datetime import date
 
+from app.services.barcode_service import clear_cache
+
 
 def _first_item(resp):
     """Extract the first item from a batch create response."""
@@ -120,6 +122,31 @@ def test_remove_item_sets_removed_at(client):
 
     history = client.get("/api/food/history").json()
     assert any(i["id"] == item_id for i in history)
+
+
+def test_patch_updates_barcode_cache_when_item_has_barcode(client):
+    clear_cache()
+    resp = client.post(
+        "/api/food",
+        json={
+            "name": "Old Title",
+            "frozen_date": str(date.today()),
+            "barcode": "1234500098765",
+            "brand": "OldBrand",
+        },
+    )
+    item_id = _first_item(resp)["id"]
+
+    client.patch(
+        f"/api/food/{item_id}",
+        json={"name": "New Title", "brand": "NewBrand"},
+    )
+
+    lookup = client.get("/api/food/lookup/1234500098765").json()
+    assert lookup["found"] is True
+    assert lookup["name"] == "New Title"
+    assert lookup["brand"] == "NewBrand"
+    assert lookup["source"] == "manual"
 
 
 def test_patch_updates_only_supplied_fields(client):

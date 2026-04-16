@@ -145,32 +145,13 @@ class BarcodeMapping(BaseModel):
 @router.post("/barcode")
 def save_barcode_mapping(payload: BarcodeMapping, db: Session = Depends(get_db)):
     """Save a manual barcode-to-product mapping so future scans resolve it."""
-    from app.models.food import BarcodeCache
-
-    existing = db.query(BarcodeCache).filter(BarcodeCache.barcode == payload.barcode).first()
-    if existing:
-        existing.name = payload.name
-        existing.brand = payload.brand or ""
-        existing.source = "manual"
-        existing.found = True
-        existing.cached_at = datetime.now(timezone.utc)
-    else:
-        entry = BarcodeCache(
-            barcode=payload.barcode,
-            name=payload.name,
-            brand=payload.brand or "",
-            source="manual",
-            found=True,
-            cached_at=datetime.now(timezone.utc),
-        )
-        db.add(entry)
+    barcode_service.sync_from_food_item(
+        db,
+        barcode=payload.barcode,
+        name=payload.name,
+        brand=payload.brand,
+    )
     db.commit()
-    barcode_service.store_in_mem_cache(payload.barcode, {
-        "name": payload.name,
-        "brand": payload.brand or "",
-        "source": "manual",
-        "found": True,
-    })
     return {"saved": True, "barcode": payload.barcode}
 
 
@@ -309,9 +290,21 @@ def update_item(
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
+    old_barcode = item.barcode
     update_data = payload.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(item, field, value)
+
+    if old_barcode and old_barcode != item.barcode:
+        barcode_service.clear_mem_cache_entry(old_barcode)
+
+    if item.barcode:
+        barcode_service.sync_from_food_item(
+            db,
+            barcode=item.barcode,
+            name=item.name,
+            brand=item.brand,
+        )
 
     db.commit()
     db.refresh(item)

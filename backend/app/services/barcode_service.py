@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 import httpx
+from sqlalchemy.orm import Session
 
 from app.config import Settings
 from app.database import SessionLocal
@@ -177,6 +178,47 @@ def clear_mem_cache_entry(barcode: str) -> None:
 
 def store_in_mem_cache(barcode: str, result: dict) -> None:
     _mem_store(barcode, result)
+
+
+def sync_from_food_item(
+    db: Session,
+    *,
+    barcode: str | None,
+    name: str,
+    brand: str | None,
+) -> None:
+    """Upsert barcode_cache and in-memory cache from an inventory item (name/brand)."""
+    if not barcode or not str(barcode).strip():
+        return
+    b = str(barcode).strip()
+    brand_str = brand or ""
+    existing = db.query(BarcodeCache).filter(BarcodeCache.barcode == b).first()
+    if existing:
+        existing.name = name
+        existing.brand = brand_str
+        existing.source = "manual"
+        existing.found = True
+        existing.cached_at = datetime.now(timezone.utc)
+    else:
+        db.add(
+            BarcodeCache(
+                barcode=b,
+                name=name,
+                brand=brand_str,
+                source="manual",
+                found=True,
+                cached_at=datetime.now(timezone.utc),
+            )
+        )
+    store_in_mem_cache(
+        b,
+        {
+            "name": name,
+            "brand": brand_str,
+            "source": "manual",
+            "found": True,
+        },
+    )
 
 
 def clear_cache() -> None:
