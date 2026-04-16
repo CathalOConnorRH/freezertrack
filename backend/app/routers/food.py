@@ -105,11 +105,16 @@ def list_grouped(category: str | None = None, freezer_id: str | None = None, db:
 
 @router.get("/search", response_model=list[FoodItemResponse])
 def search_items(q: str, db: Session = Depends(get_db)):
+    """Search for active food items by name, brand, or description (notes) using substring matching."""
     return (
         db.query(FoodItem)
         .filter(FoodItem.removed_at.is_(None))
         .filter(
-            or_(FoodItem.name.ilike(f"%{q}%"), FoodItem.brand.ilike(f"%{q}%"))
+            or_(
+                FoodItem.name.ilike(f"%{q}%"),
+                FoodItem.brand.ilike(f"%{q}%"),
+                FoodItem.notes.ilike(f"%{q}%")
+            )
         )
         .all()
     )
