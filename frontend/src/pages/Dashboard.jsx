@@ -41,6 +41,7 @@ export default function Dashboard() {
   const [acting, setActing] = useState(false);
   const [actionMsg, setActionMsg] = useState(null);
   const [expandedGroups, setExpandedGroups] = useState(new Set());
+  const [search, setSearch] = useState("");
   const navigate = useNavigate();
   const intervalRef = useRef(null);
 
@@ -164,6 +165,12 @@ export default function Dashboard() {
 
   const groups = buildGroups(items);
 
+  const filteredGroups = groups.filter(
+    (g) =>
+      g.name.toLowerCase().includes(search.toLowerCase()) ||
+      (g.brand && g.brand.toLowerCase().includes(search.toLowerCase()))
+  );
+
   const toggleGroup = (key) => {
     setExpandedGroups((prev) => {
       const next = new Set(prev);
@@ -227,8 +234,20 @@ export default function Dashboard() {
 
       <h3 className="text-base sm:text-lg font-semibold mb-3">All Items</h3>
 
+      {items.length > 0 && (
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-3 sm:mb-4">
+          <input
+            type="text"
+            placeholder="Search by name or brand..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="flex-1 border border-gray-300 rounded-lg px-3 py-2.5 sm:py-2 text-base sm:text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none"
+          />
+        </div>
+      )}
+
       <div className="space-y-2">
-        {groups.map((group) => {
+        {filteredGroups.map((group) => {
           const isMulti = group.items.length > 1;
           const isExpanded = expandedGroups.has(group.key);
 
@@ -352,6 +371,12 @@ export default function Dashboard() {
           );
         })}
       </div>
+
+      {items.length > 0 && filteredGroups.length === 0 && (
+        <p className="text-center text-[var(--text-secondary)] text-sm sm:text-base py-8">
+          No items match your search.
+        </p>
+      )}
 
       {items.length === 0 && (
         <div className="text-center py-16">
