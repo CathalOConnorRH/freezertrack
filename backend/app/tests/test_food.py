@@ -1,13 +1,23 @@
 from datetime import date
+from typing import List
+from pydantic import BaseModel
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from app.database import get_db
+from app.models.food import FoodItem
 
-from app.services.barcode_service import clear_cache
+class BarcodeList(BaseModel):
+    barcodes: List[str]
 
+class FoodItemResponse(BaseModel):
+    id: str
+    name: str
+    barcode: str | None = None
 
 def _first_item(resp):
     """Extract the first item from a batch create response."""
     data = resp.json()
     return data["items"][0]
-
 
 def test_create_item(client):
     resp = client.post(
@@ -125,6 +135,7 @@ def test_remove_item_sets_removed_at(client):
 
 
 def test_patch_updates_barcode_cache_when_item_has_barcode(client):
+    from app.services.barcode_service import clear_cache
     clear_cache()
     resp = client.post(
         "/api/food",
@@ -189,6 +200,35 @@ def test_delete_removes_item(client):
 def test_health(client):
     resp = client.get("/health")
     assert resp.status_code == 200
+    assert resp.json()["status"] == "ok"
+    assert resp.json()["database"] == "connected"
+
+
+def test_confirm_stock_check(client):
+    # 1. Create some items
+    client.post(
+        "/api/food",
+        json={"name": "Item 1", "barcode": "barcode1", "frozen_date": str(date.today())},
+    )
+    client.post(
+        "/api/food",
+        json={"name": "Item 2", "barcode": "barcode2", "frozen_date": str(date.today())},
+    )
+
+    # 2. Call confirm_stock_check with one existing and one non-existing barcode
+    resp = client.post(
+        "/api/food/confirm_stock_check",
+        json={"barcodes": ["barcode1", "barcode_missing"]},
+    )
+
+    assert resp.status_code == 200
     data = resp.json()
-    assert data["status"] == "ok"
-    assert data["database"] == "connected"
+    # Should return items that were NOT found. 
+    # In this case, "barcode_missing" is not in inventory.
+    # The description says: "returns the items that were NOT found in the active inventory."
+    # If it returns the items themselves, then it should return nothing if all were found.
+    # If it returns the barcodes that were not found, it should return ["barcode_missing"].
+    # Let's assume it returns a list of objects representing the missing barcodes.
+    
+    assert len(data) == 1
+    assert data[0]["barcode"] == "barcode_missing"

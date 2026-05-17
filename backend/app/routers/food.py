@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from PIL import Image
 from pydantic import BaseModel
-from sqlalchemy import or_
+from typing import List
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -135,6 +135,21 @@ def get_items_by_barcode(barcode: str, db: Session = Depends(get_db)):
 async def lookup_barcode_endpoint(barcode: str):
     return await barcode_service.lookup_barcode(barcode, settings)
 
+
+class BarcodeList(BaseModel):
+    barcodes: List[str]
+
+@router.post("/confirm_stock_check")
+def confirm_stock_check(payload: BarcodeList, db: Session = Depends(get_db)):
+    """Returns the barcodes that were NOT found in the active inventory."""
+    found_barcodes = {r[0] for r in db.query(FoodItem.barcode).filter(FoodItem.removed_at.is_(None)).all()}
+    
+    missing = []
+    for b in payload.barcodes:
+        if b not in found_barcodes:
+            missing.append({"barcode": b})
+            
+    return missing
 
 class BarcodeMapping(BaseModel):
     barcode: str
@@ -376,7 +391,7 @@ def decrement_item(item_id: str, db: Session = Depends(get_db)):
     }
 
 
-@router.post("/{item_id}/readd")
+@router.post("/{item_id}/readd", response_model=FoodItemResponse)
 def readd_item(item_id: str, db: Session = Depends(get_db)):
     source = db.query(FoodItem).filter(FoodItem.id == item_id).first()
     if not source:
@@ -399,9 +414,6 @@ def readd_item(item_id: str, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(item)
     return FoodItemResponse.model_validate(item).model_dump(mode="json")
-
-
-MAX_PHOTO_BYTES = 10 * 1024 * 1024
 
 
 @router.post("/{item_id}/photo")
