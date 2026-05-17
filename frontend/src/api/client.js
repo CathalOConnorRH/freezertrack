@@ -34,7 +34,8 @@ export const uploadPhoto = (id, file) => {
   form.append("file", file);
   return api.post(`/food/${id}/photo`, form).then((r) => r.data);
 };
-export const getHAState = () => api.get("/ha/state").then((r) => r.data);
+export const confirmStockCheck = (barcodes) =>
+  api.post("/food/confirm_stock_check", { barcodes }).then((r) => r.data);
 
 export const getScannerMode = () => api.get("/scanner/mode").then((r) => r.data);
 export const setScannerMode = (mode) =>
