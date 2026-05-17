@@ -160,27 +160,36 @@ export default function Scanner() {
 
       {/* Scan In / Scan Out mode toggle */}
       <div className="flex gap-2 mb-3">
-        <ModeButton
-          active={mode === "in"}
-          onClick={() => changeMode("in")}
-          icon={<LogIn size={16} />}
-          label="Scan In"
-          color="green"
-        />
-        <ModeButton
-          active={mode === "out"}
-          onClick={() => changeMode("out")}
-          icon={<LogOut size={16} />}
-          label="Scan Out"
-          color="blue"
-        />
-      </div>
-
-      <p className="text-xs text-gray-500 mb-4">
-        {mode === "in"
-          ? "Scan a barcode to add a new item to the freezer."
-          : "Scan a barcode or QR label to remove an item from the freezer."}
-      </p>
+         <ModeButton
+           active={mode === "in"}
+           onClick={() => changeMode("in")}
+           icon={<LogIn size={16} />}
+           label="Scan In"
+           color="green"
+         />
+         <ModeButton
+           active={mode === "out"}
+           onClick={() => changeMode("out")}
+           icon={<LogOut size={16} />}
+           label="Scan Out"
+           color="blue"
+         />
+          <ModeButton
+            active={mode === "stockCheck"}
+            onClick={() => changeMode("stockCheck")}
+            icon={<X size={16} />}
+            label="Stock Check"
+            color="amber"
+          />
+        </div>
+ 
+       <p className="text-xs text-gray-500 mb-4">
+         {mode === "in"
+           ? "Scan a barcode to add a new item to the freezer."
+           : mode === "stockCheck"
+           ? "Scan barcodes to check stock levels."
+           : "Scan a barcode or QR label to remove an item from the freezer."}
+       </p>
 
       {/* Input method toggle */}
       <div className="flex gap-2 mb-4 sm:mb-6">
@@ -269,6 +278,9 @@ function ModeButton({ active, onClick, icon, label, color }) {
       : "bg-gray-100 text-gray-600 hover:bg-gray-200",
     blue: active
       ? "bg-[var(--ice-blue)] text-white"
+      : "bg-gray-100 text-gray-600 hover:bg-gray-200",
+    amber: active
+      ? "bg-amber-600 text-white"
       : "bg-gray-100 text-gray-600 hover:bg-gray-200",
   };
 
