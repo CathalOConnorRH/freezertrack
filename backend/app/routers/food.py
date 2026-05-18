@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 from PIL import Image
 from pydantic import BaseModel
 from typing import List
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.config import settings
