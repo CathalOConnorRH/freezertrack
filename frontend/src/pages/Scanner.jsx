@@ -49,6 +49,11 @@ export default function Scanner() {
             type: "success",
             message: `${parsed.name || "Item"} removed from freezer`,
           });
+        } else if (mode === "stockCheck") {
+          setResult({
+            type: "success",
+            message: `"${parsed.name || "Item"}" is in stock`,
+          });
         } else {
           setResult({
             type: "warn",
@@ -63,8 +68,41 @@ export default function Scanner() {
 
     if (mode === "out") {
       await handleScanOut(rawString);
+    } else if (mode === "stockCheck") {
+      await handleStockCheck(rawString);
     } else {
       await handleScanIn(rawString);
+    }
+  };
+
+  const handleStockCheck = async (barcode) => {
+    try {
+      const items = await getItemsByBarcode(barcode);
+      if (items.length > 0) {
+        const total = items.reduce((sum, item) => sum + item.quantity, 0);
+        setResult({
+          type: "success",
+          message: `${items.length} item${items.length !== 1 ? "s" : ""} in stock (${total} total)`,
+        });
+        return;
+      }
+      const data = await lookupBarcode(barcode);
+      if (data.found) {
+        const found = await searchItems(data.name);
+        if (found.length > 0) {
+          const total = found.reduce((sum, item) => sum + item.quantity, 0);
+          setResult({
+            type: "success",
+            message: `"${data.name}" — ${found.length} item${found.length !== 1 ? "s" : ""} in stock (${total} total)`,
+          });
+        } else {
+          setResult({ type: "warn", message: `"${data.name}" not found in freezer` });
+        }
+      } else {
+        setResult({ type: "warn", message: `Barcode not found in freezer` });
+      }
+    } catch {
+      setResult({ type: "error", message: "Stock check failed. Try again." });
     }
   };
 
