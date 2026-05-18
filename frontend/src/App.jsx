@@ -13,10 +13,12 @@ import ShoppingList from "./pages/ShoppingList";
 import LabelDesigner from "./pages/LabelDesigner";
 import Admin from "./pages/Admin";
 import Debug from "./pages/Debug";
+import StockCheck from "./pages/StockCheck";
 
 const NAV = [
   { to: "/", label: "Home", icon: LayoutDashboard },
   { to: "/scan", label: "Scan", icon: ScanLine },
+  { to: "/stock-check", label: "Stock Check", icon: ScanLine },
   { to: "/add", label: "Add", icon: PlusCircle },
   { to: "/inventory", label: "Items", icon: Archive },
   { to: "/shopping", label: "Shop", icon: ShoppingCart },
@@ -87,6 +89,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/scan" element={<Scanner />} />
+          <Route path="/stock-check" element={<StockCheck />} />
           <Route path="/add" element={<AddItem />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/stats" element={<Statistics />} />
