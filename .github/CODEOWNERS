@@ -1,0 +1,8 @@
+# Code owners for FreezerTrack
+# This file defines review requirements for different parts of the repository.
+
+backend/ @CathalOConnorRH
+frontend/src/ @CathalOConnorRH
+devops.md @CathalOConnorRH
+.eslintrc.cjs @CathalOConnorRH
+pyproject.toml @CathalOConnorRH
