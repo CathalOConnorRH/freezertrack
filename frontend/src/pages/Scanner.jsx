@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { removeItem, decrementItem, lookupBarcode, searchItems, getItemsByBarcode, getScannerMode, setScannerMode } from "../api/client";
+import { removeItem, decrementItem, lookupBarcode, searchItems, getItemsByBarcode, getScannerMode, setScannerMode, saveBarcodeMapping } from "../api/client";
 import ScanInput from "../components/ScanInput";
 import CameraScanner from "../components/CameraScanner";
-import { LogIn, LogOut, X } from "lucide-react";
+import { LogIn, LogOut, X, Pencil } from "lucide-react";
 
 export default function Scanner() {
   const isMobile =
@@ -13,6 +13,10 @@ export default function Scanner() {
   const [result, setResult] = useState(null);
   const [matches, setMatches] = useState(null);
   const [removing, setRemoving] = useState(null);
+  const [fixBarcode, setFixBarcode] = useState(null);
+  const [fixName, setFixName] = useState("");
+  const [fixBrand, setFixBrand] = useState("");
+  const [fixing, setFixing] = useState(false);
   const navigate = useNavigate();
   const intervalRef = useRef(null);
 
@@ -32,8 +36,12 @@ export default function Scanner() {
     setMode(m);
     setResult(null);
     setMatches(null);
+    if (m === "stockCheck") {
+      navigate("/stock-check");
+      return;
+    }
     setScannerMode(m).catch(() => {});
-  }, []);
+  }, [navigate]);
 
   const handleScan = async (rawString) => {
     setMatches(null);
@@ -49,11 +57,6 @@ export default function Scanner() {
             type: "success",
             message: `${parsed.name || "Item"} removed from freezer`,
           });
-        } else if (mode === "stockCheck") {
-          setResult({
-            type: "success",
-            message: `"${parsed.name || "Item"}" is in stock`,
-          });
         } else {
           setResult({
             type: "warn",
@@ -68,55 +71,46 @@ export default function Scanner() {
 
     if (mode === "out") {
       await handleScanOut(rawString);
-    } else if (mode === "stockCheck") {
-      await handleStockCheck(rawString);
     } else {
       await handleScanIn(rawString);
-    }
-  };
-
-  const handleStockCheck = async (barcode) => {
-    try {
-      const items = await getItemsByBarcode(barcode);
-      if (items.length > 0) {
-        const total = items.reduce((sum, item) => sum + item.quantity, 0);
-        setResult({
-          type: "success",
-          message: `${items.length} item${items.length !== 1 ? "s" : ""} in stock (${total} total)`,
-        });
-        return;
-      }
-      const data = await lookupBarcode(barcode);
-      if (data.found) {
-        const found = await searchItems(data.name);
-        if (found.length > 0) {
-          const total = found.reduce((sum, item) => sum + item.quantity, 0);
-          setResult({
-            type: "success",
-            message: `"${data.name}" — ${found.length} item${found.length !== 1 ? "s" : ""} in stock (${total} total)`,
-          });
-        } else {
-          setResult({ type: "warn", message: `"${data.name}" not found in freezer` });
-        }
-      } else {
-        setResult({ type: "warn", message: `Barcode not found in freezer` });
-      }
-    } catch {
-      setResult({ type: "error", message: "Stock check failed. Try again." });
     }
   };
 
   const handleScanIn = async (barcode) => {
     try {
       const data = await lookupBarcode(barcode);
-      if (data.found) {
-        navigate("/add", { state: { barcode, prefill: data } });
+      if (data.found && data.name) {
+        setFixBarcode(barcode);
+        setFixName(data.name);
+        setFixBrand(data.brand || "");
+        setResult(null);
+        setMatches(null);
       } else {
         navigate("/add", { state: { barcode, prefill: { name: "", brand: "" } } });
       }
     } catch {
       setResult({ type: "error", message: "Barcode lookup failed. Try again." });
     }
+  };
+
+  const handleFixBarcode = async () => {
+    if (!fixBarcode || !fixName.trim()) return;
+    setFixing(true);
+    try {
+      await saveBarcodeMapping(fixBarcode, fixName.trim(), fixBrand || null);
+      setResult({ type: "success", message: `"${fixBarcode}" → "${fixName.trim()}" saved for future scans` });
+      setFixBarcode(null);
+      setMatches(null);
+    } catch {
+      setResult({ type: "error", message: "Failed to save barcode name." });
+    } finally {
+      setFixing(false);
+    }
+  };
+
+  const handleUseCached = async () => {
+    if (!fixBarcode) return;
+    navigate("/add", { state: { barcode: fixBarcode, prefill: { name: fixName, brand: fixBrand } } });
   };
 
   const handleScanOut = async (barcode) => {
@@ -198,36 +192,37 @@ export default function Scanner() {
 
       {/* Scan In / Scan Out mode toggle */}
       <div className="flex gap-2 mb-3">
-         <ModeButton
-           active={mode === "in"}
-           onClick={() => changeMode("in")}
-           icon={<LogIn size={16} />}
-           label="Scan In"
-           color="green"
-         />
-         <ModeButton
-           active={mode === "out"}
-           onClick={() => changeMode("out")}
-           icon={<LogOut size={16} />}
-           label="Scan Out"
-           color="blue"
-         />
           <ModeButton
-            active={mode === "stockCheck"}
-            onClick={() => changeMode("stockCheck")}
-            icon={<X size={16} />}
-            label="Stock Check"
-            color="amber"
+            active={mode === "in"}
+            onClick={() => changeMode("in")}
+            icon={<LogIn size={16} />}
+            label="Scan In"
+            color="green"
           />
-        </div>
- 
+          <ModeButton
+            active={mode === "out"}
+            onClick={() => changeMode("out")}
+            icon={<LogOut size={16} />}
+            label="Scan Out"
+            color="blue"
+          />
+         </div>
+  
        <p className="text-xs text-gray-500 mb-4">
-         {mode === "in"
-           ? "Scan a barcode to add a new item to the freezer."
-           : mode === "stockCheck"
-           ? "Scan barcodes to check stock levels."
-           : "Scan a barcode or QR label to remove an item from the freezer."}
+          {mode === "in"
+            ? "Scan a barcode to add a new item to the freezer."
+            : mode === "stockCheck"
+            ? "Scan barcodes to check stock levels."
+            : "Scan a barcode or QR label to remove an item from the freezer."}
        </p>
+
+      {/* Stock Check link */}
+      <button
+        onClick={() => changeMode("stockCheck")}
+        className="mb-4 w-full py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm font-medium text-amber-700 hover:bg-amber-100 active:scale-[0.98]"
+      >
+        🔍 Stock Check →
+      </button>
 
       {/* Input method toggle */}
       <div className="flex gap-2 mb-4 sm:mb-6">
@@ -303,6 +298,35 @@ export default function Scanner() {
           }`}
         >
           {result.message}
+        </div>
+      )}
+
+      {/* Barcode name fix form */}
+      {fixBarcode && (
+        <div className="mt-4 bg-[var(--surface)] rounded-xl border border-amber-300 p-4 sm:p-5">
+          <h3 className="text-sm font-semibold text-amber-800 mb-3 flex items-center gap-2">
+            <Pencil size={16} />Fix Barcode Name
+          </h3>
+          <p className="text-xs text-[var(--text-secondary)] mb-3">
+            This barcode currently resolves to "{fixName}". Edit the name below so future scans resolve correctly.
+          </p>
+          <label className="block text-sm font-medium text-[var(--text)] mb-1.5">Barcode</label>
+          <input type="text" value={fixBarcode} readOnly className="w-full border border-[var(--border)] rounded-lg px-3 py-2.5 text-sm bg-[var(--bg)] text-[var(--text-secondary)] mb-3" />
+          <label className="block text-sm font-medium text-[var(--text)] mb-1.5">Product Name</label>
+          <input type="text" value={fixName} onChange={(e) => setFixName(e.target.value)} className="w-full border border-[var(--border)] rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none bg-[var(--surface)] text-[var(--text)] mb-3" />
+          <label className="block text-sm font-medium text-[var(--text)] mb-1.5">Brand (optional)</label>
+          <input type="text" value={fixBrand} onChange={(e) => setFixBrand(e.target.value)} placeholder="Optional" className="w-full border border-[var(--border)] rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-[var(--ice-blue)] focus:border-transparent outline-none bg-[var(--surface)] text-[var(--text)] mb-4" />
+          <div className="flex gap-2">
+            <button onClick={handleFixBarcode} disabled={fixing || !fixName.trim()} className="flex-1 py-2.5 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 active:scale-[0.98] disabled:opacity-50 text-sm">
+              {fixing ? "Saving..." : "Save"}
+            </button>
+            <button onClick={handleUseCached} className="flex-1 py-2.5 bg-[var(--ice-blue)] text-white rounded-lg font-medium hover:bg-[#4a9bd9] active:scale-[0.98] text-sm">
+              Use as-is → Add Item
+            </button>
+            <button onClick={() => { setFixBarcode(null); setResult(null); }} className="py-2.5 px-3 bg-[var(--bg)] text-[var(--text-secondary)] rounded-lg font-medium hover:bg-[var(--border)] active:scale-[0.98] text-sm">
+              Cancel
+            </button>
+          </div>
         </div>
       )}
     </div>

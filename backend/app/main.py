@@ -10,7 +10,7 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.database import Base, engine, get_db
-from app.routers import admin, food, freezers, homeassistant, labels, scanner, shopping
+from app.routers import admin, food, freezers, homeassistant, labels, scanner, shopping, stock_check
 
 logger = logging.getLogger("freezertrack")
 
@@ -73,6 +73,7 @@ async def global_error_handler(_request: Request, exc: Exception):
 
 
 app.include_router(food.router)
+app.include_router(stock_check.router)
 app.include_router(labels.router)
 app.include_router(homeassistant.router)
 app.include_router(admin.router)

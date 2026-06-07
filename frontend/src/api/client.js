@@ -34,8 +34,25 @@ export const uploadPhoto = (id, file) => {
   form.append("file", file);
   return api.post(`/food/${id}/photo`, form).then((r) => r.data);
 };
-export const confirmStockCheck = (barcodes) =>
-  api.post("/food/confirm_stock_check", { barcodes }).then((r) => r.data);
+// ── Stock Check (session-based) ────────────────────────────────────────
+
+export const startStockCheck = () =>
+  api.post("/stock-check/start").then((r) => r.data);
+
+export const scanStockCheck = (sessionId, barcodes) =>
+  api.post(`/stock-check/${sessionId}/scan`, { barcodes }).then((r) => r.data);
+
+export const scanAndCreateItem = (sessionId, data) =>
+  api.post(`/stock-check/${sessionId}/scan-and-create`, data).then((r) => r.data);
+
+export const getStockCheckProgress = (sessionId) =>
+  api.get(`/stock-check/${sessionId}`).then((r) => r.data);
+
+export const endStockCheck = (sessionId) =>
+  api.post(`/stock-check/${sessionId}/end`).then((r) => r.data);
+
+export const removeMissingItems = (sessionId, barcodes) =>
+  api.post(`/stock-check/${sessionId}/remove-missing`, { barcodes }).then((r) => r.data);
 
 export const getHAState = () => api.get("/ha/state").then((r) => r.data);
 
