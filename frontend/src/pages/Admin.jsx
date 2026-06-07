@@ -3,6 +3,7 @@ import {
   getConfig, updateConfig, triggerUpdate, getUpdateStatus,
   restartService, restoreBackup, getPrinterStatus, invalidateLabelCache,
   getFreezers, createFreezer, deleteFreezer,
+  purgeAllItems, purgeHistory, purgeBarcodeCache, purgeShopping,
 } from "../api/client";
 import {
   RefreshCw, Save, RotateCcw, Download, FileDown, Upload,
@@ -120,6 +121,38 @@ export default function Admin() {
     catch { alert("Cannot delete a freezer that has items in it."); }
   };
 
+  const handlePurgeAllItems = async () => {
+    if (!confirm("Delete ALL food items (active + deleted)? This cannot be undone.")) return;
+    try {
+      const res = await purgeAllItems();
+      alert(`Deleted ${res.deleted} items.`);
+    } catch { alert("Failed to purge items."); }
+  };
+
+  const handlePurgeHistory = async () => {
+    if (!confirm("Hard-delete all soft-deleted items? This cannot be undone.")) return;
+    try {
+      const res = await purgeHistory();
+      alert(`Deleted ${res.deleted} deleted items.`);
+    } catch { alert("Failed to purge history."); }
+  };
+
+  const handlePurgeBarcodeCache = async () => {
+    if (!confirm("Clear the barcode lookup cache?")) return;
+    try {
+      const res = await purgeBarcodeCache();
+      alert(`Cleared ${res.deleted} cache entries.`);
+    } catch { alert("Failed to purge cache."); }
+  };
+
+  const handlePurgeShopping = async () => {
+    if (!confirm("Delete all shopping list items (active + completed)?")) return;
+    try {
+      const res = await purgeShopping();
+      alert(`Deleted ${res.deleted} shopping items.`);
+    } catch { alert("Failed to purge shopping list."); }
+  };
+
   const set = (key) => (e) => {
     const val = e.target.type === "checkbox" ? String(e.target.checked) : e.target.value;
     setForm((f) => ({ ...f, [key]: val }));
@@ -229,29 +262,38 @@ export default function Admin() {
       </section>
 
       {/* Data Management */}
-      <section className={sectionCls}>
-        <h3 className="text-base sm:text-lg font-semibold mb-4">Data Management</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mb-4">
-          <a href="/api/admin/export/csv" download className="flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-[var(--bg)] text-[var(--text)] rounded-lg font-medium hover:bg-[var(--border)] active:scale-[0.98] text-sm"><FileDown size={16} />Export CSV</a>
-          <a href="/api/admin/export/json" download className="flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-[var(--bg)] text-[var(--text)] rounded-lg font-medium hover:bg-[var(--border)] active:scale-[0.98] text-sm"><FileDown size={16} />Export JSON</a>
-        </div>
-        <div className="border-t border-[var(--border)] pt-4">
-          <h4 className="text-sm font-medium text-[var(--text)] mb-3">Database Backup</h4>
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-            <a href="/api/admin/backup" download className="flex-1 flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-[var(--ice-blue)] text-white rounded-lg font-medium hover:bg-[#4a9bd9] active:scale-[0.98] text-sm"><Download size={16} />Download Backup</a>
-            <label className="flex-1 flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 active:scale-[0.98] text-sm cursor-pointer">
-              <Upload size={16} />Restore Backup
-              <input type="file" accept=".db" className="hidden" onChange={async (e) => {
-                const file = e.target.files?.[0]; if (!file) return;
-                if (!confirm("This will REPLACE all current data. Are you sure?")) return;
-                try { const res = await restoreBackup(file); setSaveMsg({ type: "ok", text: res.message }); }
-                catch { setSaveMsg({ type: "err", text: "Failed to restore." }); }
-                e.target.value = "";
-              }} />
-            </label>
-          </div>
-        </div>
-      </section>
+       <section className={sectionCls}>
+         <h3 className="text-base sm:text-lg font-semibold mb-4">Data Management</h3>
+         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 mb-4">
+           <a href="/api/admin/export/csv" download className="flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-[var(--bg)] text-[var(--text)] rounded-lg font-medium hover:bg-[var(--border)] active:scale-[0.98] text-sm"><FileDown size={16} />Export CSV</a>
+           <a href="/api/admin/export/json" download className="flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-[var(--bg)] text-[var(--text)] rounded-lg font-medium hover:bg-[var(--border)] active:scale-[0.98] text-sm"><FileDown size={16} />Export JSON</a>
+         </div>
+         <div className="border-t border-[var(--border)] pt-4">
+           <h4 className="text-sm font-medium text-[var(--text)] mb-3">Database Backup</h4>
+           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+             <a href="/api/admin/backup" download className="flex-1 flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-[var(--ice-blue)] text-white rounded-lg font-medium hover:bg-[#4a9bd9] active:scale-[0.98] text-sm"><Download size={16} />Download Backup</a>
+             <label className="flex-1 flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-red-50 text-red-600 rounded-lg font-medium hover:bg-red-100 active:scale-[0.98] text-sm cursor-pointer">
+               <Upload size={16} />Restore Backup
+               <input type="file" accept=".db" className="hidden" onChange={async (e) => {
+                 const file = e.target.files?.[0]; if (!file) return;
+                 if (!confirm("This will REPLACE all current data. Are you sure?")) return;
+                 try { const res = await restoreBackup(file); setSaveMsg({ type: "ok", text: res.message }); }
+                 catch { setSaveMsg({ type: "err", text: "Failed to restore." }); }
+                 e.target.value = "";
+               }} />
+             </label>
+           </div>
+         </div>
+         <div className="border-t border-[var(--border)] pt-4 mt-4">
+           <h4 className="text-sm font-medium text-red-600 mb-3">Danger Zone</h4>
+           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+             <button onClick={handlePurgeAllItems} className="flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 active:scale-[0.98] text-sm"><Trash2 size={16} />Delete All Items</button>
+             <button onClick={handlePurgeHistory} className="flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 active:scale-[0.98] text-sm"><Trash2 size={16} />Purge Deleted Items</button>
+             <button onClick={handlePurgeBarcodeCache} className="flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 active:scale-[0.98] text-sm">Clear Barcode Cache</button>
+             <button onClick={handlePurgeShopping} className="flex items-center justify-center gap-2 py-3 sm:py-2.5 bg-orange-600 text-white rounded-lg font-medium hover:bg-orange-700 active:scale-[0.98] text-sm">Clear Shopping List</button>
+           </div>
+         </div>
+       </section>
 
       {/* Software Update */}
       <section className={sectionCls}>

@@ -17,7 +17,7 @@ Usage:
 Environment variables (alternative to CLI args):
   FREEZERTRACK_API_URL    e.g. http://192.168.1.100
   SCANNER_DEVICE          e.g. /dev/input/event0  (auto-detect if not set)
-  SCANNER_MODE            "out" (default) or "in"  (fallback when HA unavailable)
+  SCANNER_MODE            "out" (default), "in", or "check"  (fallback when HA unavailable)
   HA_URL                  e.g. http://homeassistant.local:8123
   HA_TOKEN                Long-lived access token from HA user profile
 """
@@ -344,13 +344,36 @@ def handle_scan_in(barcode: str, api_url: str, client: httpx.Client) -> tuple[bo
         return False, ""
 
 
+def handle_scan_check(barcode: str, api_url: str, client: httpx.Client) -> tuple[bool, list]:
+    """Process a barcode for stock check (verify in inventory). Returns (success, missing_list)."""
+    base = api_url.rstrip("/")
+
+    log.info(f"Stock checking barcode: {barcode}")
+    try:
+        resp = client.post(f"{base}/api/food/confirm_stock_check", json={"barcodes": [barcode]})
+        if resp.status_code == 200:
+            missing = resp.json()
+            if not missing:
+                log.info(f"FOUND in inventory: {barcode}")
+                return True, []
+            else:
+                log.warning(f"NOT FOUND in inventory: {barcode}")
+                return True, missing
+        else:
+            log.error(f"Stock check failed ({resp.status_code}): {resp.text}")
+            return False, [{"barcode": barcode}]
+    except Exception as e:
+        log.error(f"Stock check error: {e}")
+        return False, [{"barcode": barcode}]
+
+
 def get_mode_from_api(api_url: str, client: httpx.Client, fallback: str) -> str:
     """Read the current scan mode from the FreezerTrack API (primary source)."""
     try:
         resp = client.get(f"{api_url.rstrip('/')}/api/scanner/mode", timeout=3)
         if resp.status_code == 200:
             mode = resp.json().get("mode", "")
-            if mode in ("in", "out"):
+            if mode in ("in", "out", "check"):
                 return mode
     except Exception as e:
         log.debug(f"API mode poll failed: {e}")
@@ -368,8 +391,8 @@ def get_mode_from_ha(ha_url: str, ha_token: str, ha_client: httpx.Client,
         )
         if resp.status_code == 200:
             state = resp.json().get("state", "")
-            if state in ("scan_in", "scan_out"):
-                return "in" if state == "scan_in" else "out"
+            if state in ("scan_in", "scan_out", "check"):
+                return {"scan_in": "in", "scan_out": "out"}.get(state, state)
     except Exception as e:
         log.debug(f"HA mode poll failed: {e}")
     return fallback
@@ -397,7 +420,7 @@ def main():
     parser.add_argument("--device", default=os.environ.get("SCANNER_DEVICE", ""),
                         help="Input device path (e.g. /dev/input/event0). Auto-detects if not set.")
     parser.add_argument("--mode", default=os.environ.get("SCANNER_MODE", "out"),
-                        choices=["out", "in"], help="Scan mode: out (remove) or in (add)")
+                        choices=["out", "in", "check"], help="Scan mode: out (remove), in (add), or check (verify stock)")
     parser.add_argument("--ha-url", default=os.environ.get("HA_URL", ""),
                         help="Home Assistant URL (e.g. http://homeassistant.local:8123)")
     parser.add_argument("--ha-token", default=os.environ.get("HA_TOKEN", ""),
@@ -456,6 +479,14 @@ def main():
             if mode == "out":
                 success, item_name = handle_scan_out(barcode, args.api, client)
                 ha_message = f"Removed: {item_name}" if success else f"FAIL: {item_name or barcode[:20]}"
+            elif mode == "check":
+                check_success, missing = handle_scan_check(barcode, args.api, client)
+                if missing:
+                    names = [m.get("barcode", "unknown") for m in missing]
+                    ha_message = f"MISSING: {', '.join(names)}"
+                else:
+                    ha_message = f"FOUND: {item_name}" if item_name else f"FOUND: {barcode[:20]}"
+                success = check_success
             else:
                 success, item_name = handle_scan_in(barcode, args.api, client)
                 ha_message = f"Added: {item_name}" if success else f"FAIL: {item_name or barcode[:20]}"

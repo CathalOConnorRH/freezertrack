@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from .coordinator import FreezerTrackCoordinator
     from .data import FreezerTrackConfigEntry
 
-OPTIONS_MAP = {"in": "Scan In", "out": "Scan Out"}
+OPTIONS_MAP = {"in": "Scan In", "out": "Scan Out", "check": "Check Stock"}
 REVERSE_MAP = {v: k for k, v in OPTIONS_MAP.items()}
 
 

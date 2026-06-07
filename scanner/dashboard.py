@@ -83,6 +83,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   .mode-btn:active { transform: scale(0.97); }
   .mode-btn.active-in { background: var(--green); color: #fff; border-color: var(--green); }
   .mode-btn.active-out { background: var(--ice); color: #fff; border-color: var(--ice); }
+  .mode-btn.active-check { background: var(--amber); color: #fff; border-color: var(--amber); }
   .mode-btn svg { width: 18px; height: 18px; }
   .refresh-note { text-align: center; color: #475569; font-size: 0.75rem; margin-top: 1rem; }
 </style>
@@ -105,6 +106,10 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     <button class="mode-btn" id="btn-out" onclick="setMode('out')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
       Scan Out
+    </button>
+    <button class="mode-btn" id="btn-check" onclick="setMode('check')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      Check
     </button>
   </div>
 
@@ -174,9 +179,12 @@ function relTime(iso) {
 function updateModeButtons(mode) {
   const btnIn = document.getElementById('btn-in');
   const btnOut = document.getElementById('btn-out');
+  const btnCheck = document.getElementById('btn-check');
   btnIn.className = 'mode-btn' + (mode === 'in' ? ' active-in' : '');
   btnOut.className = 'mode-btn' + (mode === 'out' ? ' active-out' : '');
-  document.getElementById('mode').textContent = 'Scan ' + (mode || 'out').charAt(0).toUpperCase() + (mode || 'out').slice(1);
+  btnCheck.className = 'mode-btn' + (mode === 'check' ? ' active-check' : '');
+  const labels = {in: 'Scan In', out: 'Scan Out', check: 'Stock Check'};
+  document.getElementById('mode').textContent = labels[mode] || 'Scan ' + (mode || 'out').charAt(0).toUpperCase() + (mode || 'out').slice(1);
 }
 
 async function setMode(m) {
